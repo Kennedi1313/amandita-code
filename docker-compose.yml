@@ -65,6 +65,14 @@ services:
     depends_on:
       - amandita-api
     restart: unless-stopped
+    
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    volumes:
+      - ~/.cloudflared:/root/.cloudflared:ro
+    command: tunnel run
+    restart: unless-stopped
 
 networks:
   amandita-network:
