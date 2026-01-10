@@ -11,10 +11,6 @@ import {
     IconButton,
     Link,
     Menu,
-    MenuButton,
-    MenuDivider,
-    MenuItem,
-    MenuList,
     Text,
     useColorModeValue,
     useDisclosure,
@@ -27,8 +23,6 @@ import {
 } from '@chakra-ui/react';
 
 import {
-    FiBell,
-    FiChevronDown,
     FiDollarSign,
     FiHome,
     FiLogOut,

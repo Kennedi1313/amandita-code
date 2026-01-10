@@ -1,10 +1,25 @@
-FROM openjdk:17-jdk-slim
+# -------- STAGE 1: build --------
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 
-# Copiar o arquivo JAR da API para o contêiner
-COPY target/amandita-api-1.0-SNAPSHOT.jar /amandita-api.jar
+WORKDIR /app
 
-# Executar o JAR
-ENTRYPOINT ["java", "-jar", "/amandita-api.jar"]
+# Copia apenas o necessário primeiro (cache)
+COPY pom.xml .
+RUN mvn dependency:go-offline
 
-# Expor a porta da API
+# Copia o resto do código
+COPY src ./src
+
+# Build do JAR
+RUN mvn clean package -DskipTests
+
+# -------- STAGE 2: runtime --------
+FROM eclipse-temurin:17-jre-alpine
+
+WORKDIR /app
+
+COPY --from=build /app/target/*jar app.jar
+
 EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
