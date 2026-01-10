@@ -1,0 +1,74 @@
+services:
+  db:
+    container_name: amandita-db
+    image: amandita-db:latest   
+    build:                      
+      context: db            
+    environment:
+      POSTGRES_USER: amandita
+      POSTGRES_PASSWORD: password
+      PGDATA: /data/postgres
+    volumes:
+      - db:/data/postgres
+    ports:
+      - "5432:5432"
+    networks:
+      - amandita-network
+    restart: unless-stopped
+
+  amandita-api:
+    container_name: amandita-api
+    image: amandita-api:latest
+    build:
+      context: backend
+      dockerfile: Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/amandita
+    env_file:
+      - .env
+    ports:
+      - "8080:8080"
+    networks:
+      - amandita-network
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  amandita-admin:
+    container_name: amandita-admin
+    image: amandita-admin:latest
+    build:
+      context: admin
+      dockerfile: Dockerfile
+      args:
+        api_base_url: http://amandita-api:8080
+    ports:
+      - "4173:4173"
+    networks:
+      - amandita-network
+    depends_on:
+      - amandita-api
+    restart: unless-stopped
+
+  amandita-frontend:
+    container_name: amandita-frontend
+    image: amandita-frontend:latest
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+      args:
+        api_base_url: http://amandita-api:8080
+    ports:
+      - "3000:3000"
+    networks:
+      - amandita-network
+    depends_on:
+      - amandita-api
+    restart: unless-stopped
+
+networks:
+  amandita-network:
+    driver: bridge
+
+volumes:
+  db:
