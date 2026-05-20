@@ -16,8 +16,8 @@
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <docker.username>amandita</docker.username>
         <docker.image.name>amandita-api</docker.image.name>
         <docker.image.tag/>
@@ -258,7 +258,7 @@
                 <version>3.3.1</version>
                 <configuration>
                     <from>
-                        <image>eclipse-temurin:17</image>
+                        <image>eclipse-temurin:21</image>
                         <platforms>
                             <platform>
                                 <architecture>arm64</architecture>
