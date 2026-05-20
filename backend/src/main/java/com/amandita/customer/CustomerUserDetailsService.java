@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class CustomerUserDetailsService implements UserDetailsService {
 
+    @SuppressWarnings("unused")
     private final CustomerDao customerDao;
 
     public CustomerUserDetailsService(@Qualifier("jpa") CustomerDao customerDao) {

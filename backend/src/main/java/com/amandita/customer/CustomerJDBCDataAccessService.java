@@ -29,7 +29,7 @@ public class CustomerJDBCDataAccessService {
         return jdbcTemplate.query(sql, customerRowMapper);
     }
 
-
+    @SuppressWarnings("unchecked")
     public Optional<Customer> selectCustomerById(Integer id) {
         var sql = """
                 SELECT id, name, email, password, age, gender, profile_image_id
@@ -41,7 +41,7 @@ public class CustomerJDBCDataAccessService {
                 .findFirst();
     }
 
-
+    @SuppressWarnings("unchecked")
     public Optional<Customer> selectUserByCpf(String cpf) {
         return Optional.empty();
     }

@@ -45,26 +45,31 @@ public class ProductService {
                 .map(productDTOMapper);
     }
 
+    @SuppressWarnings("unchecked")
     public Page<ProductDTO> getAllProductsByStore(int page, int size, Long storeId) {
         return productDao.selectAllProductsByStore(page, size, storeId)
                 .map(productDTOMapper);
     }
 
+    @SuppressWarnings("unchecked")
     public Page<ProductDTO> findProductsByCategoryByStore(String category, int page, int size, Long storeId) {
         return productDao.findProductsByCategoryByStore(category, page, size, storeId)
                 .map(productDTOMapper);
     }
 
+    @SuppressWarnings("unchecked")
     public Page<ProductDTO> findProductsByCategory(String category, int page, int size) {
         return productDao.findProductsByCategory(category, page, size)
                 .map(productDTOMapper);
     }
 
+    @SuppressWarnings("unchecked")
     public Page<ProductDTO> findProductsByNameByStore(String query, int page, int size, Long storeId) {
         return productDao.findProductsByNameByStore(query, page, size, storeId)
                 .map(productDTOMapper);
     }
 
+    @SuppressWarnings("unchecked")
     public ProductDTO getProductById(Integer productId) {
         return productDao.selectProductById(productId)
                 .map(productDTOMapper)

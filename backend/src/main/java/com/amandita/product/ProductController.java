@@ -4,7 +4,6 @@ import com.amandita.Sale.Sale;
 import com.amandita.Sale.SaleRequest;
 import com.amandita.Sale.SaleResponse;
 import com.amandita.jwt.JWTUtil;
-import com.amandita.store.Store;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

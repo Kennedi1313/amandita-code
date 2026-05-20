@@ -1,5 +1,5 @@
-import React from 'react';
-import { usePagination, DOTS } from '../../hooks/use-pagination';
+import React from "react";
+import { usePagination, DOTS } from "../../hooks/use-pagination";
 import { Box, Flex, Button, Icon } from "@chakra-ui/react";
 import { BsArrowLeft, BsArrowRight } from "react-icons/bs";
 
@@ -10,14 +10,14 @@ const Pagination = (props) => {
     siblingCount = 1,
     currentPage,
     pageSize,
-    className
+    className,
   } = props;
 
   const paginationRange = usePagination({
     currentPage,
     totalCount,
     siblingCount,
-    pageSize
+    pageSize,
   });
 
   if (paginationRange.length < 2) {

@@ -7,7 +7,6 @@ import com.amandita.s3.S3Buckets;
 import com.amandita.s3.S3Service;
 import com.amandita.store.Store;
 import com.amandita.store.StoreDao;
-import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.password.PasswordEncoder;

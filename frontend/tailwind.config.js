@@ -8,25 +8,24 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'black-1000': '#121212',
-        'rose-1000': '#F4EBE7',
-        'brown-1000': '#B48F57',
-        'green-whatsapp': '#3cc13f'
+        "black-1000": "#121212",
+        "rose-1000": "#F4EBE7",
+        "brown-1000": "#B48F57",
+        "green-whatsapp": "#3cc13f",
       },
       fontFamily: {
-        'dream-avenue': ['DreamAvenue'],
-        'sans': ['Roboto', 'Helvetica', 'Arial', 'sans-serif', 'Unlock'],
-        'unlock': ['Unlock', 'Roboto']
+        "dream-avenue": ["DreamAvenue"],
+        sans: ["Roboto", "Helvetica", "Arial", "sans-serif", "Unlock"],
+        unlock: ["Unlock", "Roboto"],
       },
       backgroundImage: {
-        'retrato': "url('/colecao_dia_das_maes_retrato.png')",
-        'vertical': "url('/colecao_dia_das_maes.png')"
-      }
+        retrato: "url('/colecao_dia_das_maes_retrato.png')",
+        vertical: "url('/colecao_dia_das_maes.png')",
+      },
     },
-    
   },
   variants: {
-    display:['group-hover']
+    display: ["group-hover"],
   },
   plugins: [],
-}
+};

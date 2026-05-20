@@ -51,11 +51,13 @@ public class ProductJPADataAccessService implements ProductDao {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Optional<Product> selectProductById(Integer productId) {
         return productRepository.findById(productId);
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Product insertProduct(Product product) {
         return productRepository.save(product);
     }
@@ -71,6 +73,7 @@ public class ProductJPADataAccessService implements ProductDao {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void updateProduct(Product product) {
         productRepository.save(product);
     }

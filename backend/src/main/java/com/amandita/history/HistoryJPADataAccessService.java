@@ -18,6 +18,7 @@ public class HistoryJPADataAccessService implements HistoryDao {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public History insertHistory(History history) {
         return historyRepository.save(history);
     }

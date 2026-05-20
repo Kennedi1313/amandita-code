@@ -8,22 +8,22 @@ const PriceInput = ({ label, value, onChange, name, id }) => {
       <InputGroup focusBorderColor="#5f5482">
         <InputLeftAddon backgroundColor="#ebe5fc">R$</InputLeftAddon>
         <Input
-            as={NumericFormat}
-            name={name}
-            id={id}
-            value={value}
-            onValueChange={(vals) => {
-                onChange(vals.formattedValue, vals.value); 
-            }}
-            thousandSeparator="."
-            decimalSeparator=","
-            decimalScale={2}
-            fixedDecimalScale
-            allowNegative={false}
-            placeholder="Digite o preço de venda do produto"
-            borderColor="#ebe5fc"
-            focusBorderColor="#5f5482"
-            width="100%"
+          as={NumericFormat}
+          name={name}
+          id={id}
+          value={value}
+          onValueChange={(vals) => {
+            onChange(vals.formattedValue, vals.value);
+          }}
+          thousandSeparator="."
+          decimalSeparator=","
+          decimalScale={2}
+          fixedDecimalScale
+          allowNegative={false}
+          placeholder="Digite o preço de venda do produto"
+          borderColor="#ebe5fc"
+          focusBorderColor="#5f5482"
+          width="100%"
         />
       </InputGroup>
     </>

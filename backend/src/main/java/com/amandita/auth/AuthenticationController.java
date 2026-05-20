@@ -1,6 +1,5 @@
 package com.amandita.auth;
 
-import com.amandita.store.Store;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;

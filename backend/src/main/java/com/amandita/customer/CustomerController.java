@@ -1,7 +1,6 @@
 package com.amandita.customer;
 
 import com.amandita.jwt.JWTUtil;
-import com.amandita.store.Store;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;

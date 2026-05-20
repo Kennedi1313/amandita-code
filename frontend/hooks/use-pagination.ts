@@ -1,12 +1,12 @@
-import React from 'react';
-import { useMemo } from 'react';
+import React from "react";
+import { useMemo } from "react";
 interface Props {
-  totalCount: number,
-  siblingCount: number,
-  currentPage: number,
-  pageSize: number,
+  totalCount: number;
+  siblingCount: number;
+  currentPage: number;
+  pageSize: number;
 }
-export const DOTS = '...';
+export const DOTS = "...";
 
 const range = (start: number, end: number) => {
   let length = end - start + 1;
@@ -17,10 +17,10 @@ export const usePagination = ({
   totalCount,
   pageSize,
   siblingCount = 1,
-  currentPage
-} : Props) => {
+  currentPage,
+}: Props) => {
   const paginationRange = useMemo(() => {
-    const totalPageCount = Math.ceil((totalCount / pageSize) - 1);
+    const totalPageCount = Math.ceil(totalCount / pageSize - 1);
 
     // Pages count is determined as siblingCount + firstPage + lastPage + currentPage + 2*DOTS
     const totalPageNumbers = siblingCount + 5;
@@ -36,7 +36,7 @@ export const usePagination = ({
     const leftSiblingIndex = Math.max(currentPage - siblingCount, 1);
     const rightSiblingIndex = Math.min(
       currentPage + siblingCount,
-      totalPageCount
+      totalPageCount,
     );
 
     /*
@@ -61,7 +61,7 @@ export const usePagination = ({
       let rightItemCount = 3 + 2 * siblingCount;
       let rightRange = range(
         totalPageCount - rightItemCount + 1,
-        totalPageCount
+        totalPageCount,
       );
       return [firstPageIndex, DOTS, ...rightRange];
     }

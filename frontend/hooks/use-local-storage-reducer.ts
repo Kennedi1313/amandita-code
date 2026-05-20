@@ -1,11 +1,15 @@
-import { Dispatch, Reducer, useEffect, useReducer, useRef } from 'react';
-import { isClient } from '@/lib/utils';
-import { Action, State } from './use-shopping-favorites';
+import { Dispatch, Reducer, useEffect, useReducer, useRef } from "react";
+import { isClient } from "@/lib/utils";
+import { Action, State } from "./use-shopping-favorites";
 
-const useLocalStorageReducer = (key = '', reducer: Reducer<State, Action>, initialValue: State|null = null) => {
+const useLocalStorageReducer = (
+  key = "",
+  reducer: Reducer<State, Action>,
+  initialValue: State | null = null,
+) => {
   const [state, dispatch] = useReducer(reducer, initialValue, () => {
     try {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const item = window.localStorage.getItem(key);
         return item ? JSON.parse(item) : initialValue;
       }
@@ -30,7 +34,7 @@ const useLocalStorageReducer = (key = '', reducer: Reducer<State, Action>, initi
     }
   }, [state]);
 
-  return [ state, dispatch ];
+  return [state, dispatch];
 };
 
 export default useLocalStorageReducer;

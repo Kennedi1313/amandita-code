@@ -1,13 +1,13 @@
-import React from 'react';
-import { usePagination, DOTS } from '../hooks/use-pagination';
-import { BsArrowLeft, BsArrowRight } from 'react-icons/bs';
+import React from "react";
+import { usePagination, DOTS } from "../hooks/use-pagination";
+import { BsArrowLeft, BsArrowRight } from "react-icons/bs";
 interface Props {
-    onPageChange: Function,
-    totalCount: number,
-    siblingCount?: number,
-    currentPage: number,
-    pageSize: number,
-    className: string
+  onPageChange: Function;
+  totalCount: number;
+  siblingCount?: number;
+  currentPage: number;
+  pageSize: number;
+  className: string;
 }
 const Pagination = (props: Props) => {
   const {
@@ -16,14 +16,14 @@ const Pagination = (props: Props) => {
     siblingCount = 1,
     currentPage,
     pageSize,
-    className
+    className,
   } = props;
 
   const paginationRange = usePagination({
     currentPage,
     totalCount,
     siblingCount,
-    pageSize
+    pageSize,
   });
 
   if (paginationRange.length < 2) {
@@ -40,25 +40,35 @@ const Pagination = (props: Props) => {
 
   let lastPage = paginationRange[paginationRange.length - 1];
   return (
-    <div
-      className="flex flex-row gap-2 w-full items-center justify-center mt-8"
-    >
-      <a href='#'
-        className={currentPage === 0 ? "pointer-events-none opacity-30 border-solid border-2 border-gray-500 p-2 rounded-md" : 
-        "border-solid border-2 border-gray-500 p-2 rounded-md"}
+    <div className="flex flex-row gap-2 w-full items-center justify-center mt-8">
+      <a
+        href="#"
+        className={
+          currentPage === 0
+            ? "pointer-events-none opacity-30 border-solid border-2 border-gray-500 p-2 rounded-md"
+            : "border-solid border-2 border-gray-500 p-2 rounded-md"
+        }
         onClick={onPrevious}
       >
         <BsArrowLeft></BsArrowLeft>
       </a>
-      {paginationRange?.map((pageNumber : any) => {
+      {paginationRange?.map((pageNumber: any) => {
         if (pageNumber === DOTS) {
-          return <div key={pageNumber} className="pagination-item dots">&#8230;</div>;
+          return (
+            <div key={pageNumber} className="pagination-item dots">
+              &#8230;
+            </div>
+          );
         }
 
         return (
-          <a href='#' key={pageNumber}
-            className={pageNumber === currentPage ? "pointer-events-none border-solid border-b-2 border-gray-500 p-2" : 
-            "p-2"
+          <a
+            href="#"
+            key={pageNumber}
+            className={
+              pageNumber === currentPage
+                ? "pointer-events-none border-solid border-b-2 border-gray-500 p-2"
+                : "p-2"
             }
             onClick={() => onPageChange(pageNumber)}
           >
@@ -66,9 +76,13 @@ const Pagination = (props: Props) => {
           </a>
         );
       })}
-      <a href='#'
-        className={currentPage === lastPage ? "pointer-events-none opacity-30 border-solid border-2 border-gray-500 p-2 rounded-md" : 
-        "border-solid border-2 border-gray-500 p-2 rounded-md"}
+      <a
+        href="#"
+        className={
+          currentPage === lastPage
+            ? "pointer-events-none opacity-30 border-solid border-2 border-gray-500 p-2 rounded-md"
+            : "border-solid border-2 border-gray-500 p-2 rounded-md"
+        }
         onClick={onNext}
       >
         <BsArrowRight></BsArrowRight>

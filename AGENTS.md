@@ -23,10 +23,11 @@ This repository is designed for local Docker Compose development and service-lev
 
 ## What agents should do first
 
-1. Read `AGENTS.md` and `.github/ai-guide.md`.
+1. Read `AGENTS.md` and `.github/ai-guide.md`. If `AGENTS.md` is missing, notify the user and use `.github/ai-guide.md` as the primary reference.
 2. Confirm the requested scope and target service(s) with the user.
-3. Avoid broad changes across multiple services unless explicitly requested.
-4. Preserve existing API contracts and runtime ports unless the user asks to change them.
+3. Clarify whether the request requires changes that affect multiple services or the overall repository architecture (for example, cross-service API changes, shared DB schema updates, or deployment topology changes).
+4. Avoid changes that affect multiple services or the overall repository architecture unless the user explicitly requests them; if a cross-service change is required, document the affected services, proposed plan, and expected validation steps before implementing.
+5. Preserve existing API endpoints, data formats, and runtime ports unless the user asks to change them (explicit confirmation required for breaking changes).
 
 ## Service boundaries
 
@@ -63,9 +64,20 @@ docker compose up --build
 
 ## Agent development best practices
 
-- Make incremental changes with one objective per commit.
-- Keep detailed documentation up to date when changing service behavior, ports, or commands.
-- Do not change API endpoints, database schemas, or core runtime architecture unless the user explicitly asks.
+Code changes:
+- Make small, incremental changes with one objective per commit; prioritize safety and minimal surface area.
+- When proposing changes, list affected services, files, and API contract impacts; request user confirmation for breaking or cross-service changes.
+
+Documentation updates:
+- Update `README.md`, service README files, and `.github/ai-guide.md` when changing ports, build commands, or service structure. Treat documentation updates as part of the same PR as code changes.
+
+Coordination & cross-service changes:
+- If a change impacts multiple services, document dependencies, create a validation plan, and run builds/tests for all affected services before merging.
+- Notify the user and require explicit approval for architectural or DB schema changes.
+
+Verification:
+- Verify changes with service-specific build/test commands and Docker Compose before finalizing.
+
 - Prefer service-specific README files for command and dependency details.
 - Use Docker Compose as the source of truth for service links and local runtime wiring.
 - If a service-specific README is missing or outdated, update it as part of the work.

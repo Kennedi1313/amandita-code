@@ -43,6 +43,7 @@ public class Address {
     @Column(nullable = false)
     private String reference;
 
+    @SuppressWarnings("unused")
     private Address() {}
 
     public Address(String zip, String street, Long number, String district, String city, String reference) {

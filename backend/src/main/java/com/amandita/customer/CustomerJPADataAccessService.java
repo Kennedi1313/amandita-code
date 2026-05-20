@@ -23,6 +23,7 @@ public class CustomerJPADataAccessService implements CustomerDao {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Optional<Customer> selectCustomerById(Integer id) {
         return customerRepository.findById(id);
     }
@@ -38,6 +39,7 @@ public class CustomerJPADataAccessService implements CustomerDao {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public Customer insertCustomer(Customer customer) {
         return customerRepository.save(customer);
     }
@@ -63,6 +65,7 @@ public class CustomerJPADataAccessService implements CustomerDao {
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public void updateCustomer(Customer update) {
         customerRepository.save(update);
     }
