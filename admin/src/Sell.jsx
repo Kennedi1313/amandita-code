@@ -27,7 +27,7 @@ import { useShoppingFavorites } from "./hooks/use-shopping-favorites.jsx";
 import { sell } from "./services/product-client.js";
 import CustomerStep from "./components/sell/CustomerStep.jsx";
 import SidebarWithHeader from "./components/shared/SideBar.jsx";
-import { getUrl } from "./services/client.js";
+import { getStoreConfig, getUrl } from "./services/client.js";
 
 const Sell = () => {
   const formatCurrency = (
@@ -87,6 +87,7 @@ const Sell = () => {
       if (searchTerm === "") return;
       const response = await fetch(
         `${getUrl()}/api/v1/products/by-name?query=${searchTerm}&page=${0}&size=${500}`,
+        getStoreConfig(),
       );
       const data = await response.json();
       setSearchResults(data.content);

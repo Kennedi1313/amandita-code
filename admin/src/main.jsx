@@ -11,7 +11,8 @@ import ProtectedRoute from "./components/shared/ProtectedRoute.jsx";
 import "./index.css";
 import Home from "./Home.jsx";
 import Product from "./Product.jsx";
-import Sell from "./Sell.jsx";
+import StoreSettings from "./StoreSettings.jsx";
+import Categories from "./Categories.jsx";
 import { FavoritesProvider } from "./hooks/use-shopping-favorites.jsx";
 import { PaginationProvider } from "./components/context/PaginationContext.jsx";
 
@@ -51,10 +52,18 @@ const router = createBrowserRouter([
     ),
   },
   {
-    path: "dashboard/sell",
+    path: "dashboard/store",
     element: (
       <ProtectedRoute>
-        <Sell />
+        <StoreSettings />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: "dashboard/categories",
+    element: (
+      <ProtectedRoute>
+        <Categories />
       </ProtectedRoute>
     ),
   },

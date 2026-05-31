@@ -64,7 +64,14 @@ export default function App({ Component, pageProps }: AppProps) {
         <title>
           {storeInfo.name} | @{storeInfo.instagram}
         </title>
-        <link rel="icon" href={"/" + storeInfo.iconUrl + ".ico"} />
+        <link
+          rel="icon"
+          href={
+            storeInfo.iconUrl.match(/^https?:\/\//i)
+              ? storeInfo.iconUrl
+              : "/" + storeInfo.iconUrl + ".png"
+          }
+        />
       </Head>
       <HelmetProvider>
         <Helmet>

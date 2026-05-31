@@ -18,7 +18,7 @@ public class Category {
     @JsonBackReference
     private Store store;
 
-    private Category() { }
+    public Category() { }
 
     public Long getId() {
         return id;

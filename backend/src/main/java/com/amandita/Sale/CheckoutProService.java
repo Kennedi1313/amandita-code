@@ -5,6 +5,7 @@ import com.amandita.customer.Customer;
 import com.amandita.customer.CustomerDao;
 import com.amandita.product.Product;
 import com.amandita.product.ProductDao;
+import com.amandita.product.ProductVariation;
 import com.amandita.store.Store;
 import com.amandita.store.StoreDao;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -22,10 +23,12 @@ import com.mercadopago.exceptions.MPException;
 import com.mercadopago.resources.payment.Payment;
 import com.mercadopago.resources.preference.Preference;
 import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 @Service
@@ -34,12 +37,18 @@ public class CheckoutProService {
     private final SaleDao saleDao;
     private final CustomerDao customerDao;
     private final StoreDao storeDao;
+    private final String publicApiUrl;
 
-    public CheckoutProService(ProductDao productDao, SaleDao saleDao, CustomerDao customerDao, StoreDao storeDao) {
+    public CheckoutProService(ProductDao productDao,
+                              SaleDao saleDao,
+                              CustomerDao customerDao,
+                              StoreDao storeDao,
+                              @Value("${app.public-api-url:http://localhost:8080}") String publicApiUrl) {
         this.productDao = productDao;
         this.saleDao = saleDao;
         this.customerDao = customerDao;
         this.storeDao = storeDao;
+        this.publicApiUrl = publicApiUrl.replaceAll("/+$", "");
     }
 
     private static void updateSale(SaleRequest request, Sale sale, double totalPrice, List<SaleItem> saleItems, Customer customer, Store store) {
@@ -51,10 +60,11 @@ public class CheckoutProService {
         sale.setStore(store);
     }
 
-    private static SaleItem getSaleItem(SaleItemRequest item, Sale sale, Product product, int unitePrice) {
+    private static SaleItem getSaleItem(SaleItemRequest item, Sale sale, Product product, ProductVariation variation, int unitePrice) {
         SaleItem saleItem = new SaleItem();
         saleItem.setSale(sale);
         saleItem.setProduct(product);
+        saleItem.setVariation(variation);
         saleItem.setQuantity(item.getQuantity());
         saleItem.setPrice(unitePrice);
         return saleItem;
@@ -85,7 +95,7 @@ public class CheckoutProService {
 
     public ResponseEntity<Payment> createPaymentForCreditCard(PaymentRequestForCreditCard request, long storeId) throws MPException, MPApiException {
         Store store = storeDao.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Loja nao identificada"));
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
 
         MercadoPagoConfig.setAccessToken(store.getMercadoPagoSecretKey());
         PaymentClient client = new PaymentClient();
@@ -100,19 +110,12 @@ public class CheckoutProService {
         List<SaleItem> saleItems = new ArrayList<>();
         double totalPrice = 0.0;
         for (SaleItemRequest item : request.getSaleRequest().getSaleItemRequests()) {
-            Product product = productDao.selectProductById(item.getProductId())
+            Product product = productDao.selectProductByIdAndStore(item.getProductId(), storeId)
                     .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + item.getProductId()));
 
-            if (product.getQuantity() < item.getQuantity()) {
-                throw new IllegalArgumentException("Estoque insuficiente para " + product.getName());
-            }
-            boolean hasPromo = product.getPromo() != null && product.getPromo() > 0;
-            double unitePrice = hasPromo ?
-                    (product.getPrice() * ( 1 - (product.getPromo() / 100.00))) :
-                    product.getPrice();
-            unitePrice = unitePrice / 100;
-            saleItems.add(getSaleItem(item, sale, product, (int) unitePrice));
-            totalPrice += unitePrice * item.getQuantity();
+            PricedSaleItem pricedItem = resolvePricedSaleItem(item, sale, product);
+            saleItems.add(pricedItem.saleItem());
+            totalPrice += pricedItem.unitPriceInCents() / 100.0 * item.getQuantity();
         }
 
         if (totalPrice + request.getSaleRequest().getShippingFee().doubleValue() / 100 != request.getTransactionAmount().doubleValue()) {
@@ -141,7 +144,7 @@ public class CheckoutProService {
                 .paymentMethodId(request.getPaymentMethodId())
                 .issuerId(request.getIssuerId())
                 .payer(payerRequest)
-                .notificationUrl("https://api." + store.getDomain() + "/api/v1/payment/webhook?source_news=webhooks")
+                .notificationUrl(publicApiUrl + "/api/v1/payment/webhook?source_news=webhooks")
                 .binaryMode(true)
                 .statementDescriptor(store.getName())
                 .externalReference(String.valueOf(sale.getId()))
@@ -157,7 +160,7 @@ public class CheckoutProService {
 
     public ResponseEntity<Payment> createPaymentForPix(PaymentRequestForPix request, long storeId) throws MPException, MPApiException {
         Store store = storeDao.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Loja nao identificada"));
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
 
         MercadoPagoConfig.setAccessToken(store.getMercadoPagoSecretKey());
         PaymentClient client = new PaymentClient();
@@ -172,21 +175,12 @@ public class CheckoutProService {
         List<SaleItem> saleItems = new ArrayList<>();
         double totalPrice = 0.0;
         for (SaleItemRequest item : request.getSaleRequest().getSaleItemRequests()) {
-            Product product = productDao.selectProductById(item.getProductId())
+            Product product = productDao.selectProductByIdAndStore(item.getProductId(), storeId)
                     .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + item.getProductId()));
 
-            if (product.getQuantity() < item.getQuantity()) {
-                throw new IllegalArgumentException("Estoque insuficiente para " + product.getName());
-            }
-            boolean hasPromo = product.getPromo() != null && product.getPromo() > 0;
-
-            double unitePrice = hasPromo ?
-                    (product.getPrice() * ( 1 - (product.getPromo() / 100.00))) :
-                    product.getPrice();
-
-            unitePrice = unitePrice / 100;
-            saleItems.add(getSaleItem(item, sale, product, (int) unitePrice));
-            totalPrice += unitePrice * item.getQuantity();
+            PricedSaleItem pricedItem = resolvePricedSaleItem(item, sale, product);
+            saleItems.add(pricedItem.saleItem());
+            totalPrice += pricedItem.unitPriceInCents() / 100.0 * item.getQuantity();
         }
 
         if (totalPrice + request.getSaleRequest().getShippingFee().doubleValue() / 100 != request.getTransactionAmount().doubleValue()) {
@@ -211,7 +205,7 @@ public class CheckoutProService {
                 .transactionAmount(request.getTransactionAmount())
                 .paymentMethodId(request.getPaymentMethodId())
                 .payer(payerRequest)
-                .notificationUrl("https://api." + store.getDomain() + "/api/v1/payment/webhook?source_news=webhooks")
+                .notificationUrl(publicApiUrl + "/api/v1/payment/webhook?source_news=webhooks")
                 .binaryMode(true)
                 .statementDescriptor("Amandita Pratas")
                 .externalReference(String.valueOf(sale.getId()))
@@ -221,9 +215,10 @@ public class CheckoutProService {
         return ResponseEntity.ok(response);
     }
 
+    @Transactional
     public void processPayment(String payload, Long storeId) throws JsonProcessingException, MPException, MPApiException {
         Store store = storeDao.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Loja nao identificada"));
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
 
         ObjectMapper objectMapper = new ObjectMapper();
         JsonNode jsonNode = objectMapper.readTree(payload);
@@ -238,17 +233,20 @@ public class CheckoutProService {
 
             if (payment != null) {
                 String paymentStatus = payment.getStatus();
-                Sale sale = saleDao.findById(Long.valueOf(payment.getExternalReference()))
+                Sale sale = saleDao.findByIdForUpdate(Long.valueOf(payment.getExternalReference()))
                         .orElseThrow(() -> new IllegalArgumentException("Nenhuma venda encontrada: " + paymentId));
+                if (sale.getStore() == null || !Objects.equals(sale.getStore().getId(), storeId)) {
+                    throw new IllegalArgumentException("Venda não pertence à loja do webhook: " + paymentId);
+                }
                 if (sale != null) {
-                    sale.setStatus("approved".equals(paymentStatus) ? "APROVADO" : "RECUSADO");
+                    String nextStatus = "approved".equals(paymentStatus) ? "APROVADO" : "RECUSADO";
+                    boolean shouldDecrementStock = "APROVADO".equals(nextStatus) && !"APROVADO".equals(sale.getStatus());
+                    sale.setStatus(nextStatus);
                     sale.setPaymentId(paymentId);
                     saleDao.insertSale(sale);
-                    sale.getSaleItems()
-                            .forEach(saleItem -> {
-                                saleItem.getProduct().updateQuantity(saleItem.getQuantity());
-                                productDao.updateProduct(saleItem.getProduct());
-                            });
+                    if (shouldDecrementStock) {
+                        decrementStock(sale);
+                    }
                 System.out.println("Payment with paymentID " + paymentId + " had its status updated to: " + paymentStatus);
                 } else {
                     System.err.println("No sale found for payment ID: " + paymentId);
@@ -261,7 +259,7 @@ public class CheckoutProService {
 
     public ResponseEntity<String> getPaymentStatus(Long paymentId, Long storeId) throws MPException, MPApiException {
         Store store = storeDao.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Loja nao identificada"));
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
 
         MercadoPagoConfig.setAccessToken(store.getMercadoPagoSecretKey());
         PaymentClient paymentClient = new PaymentClient();
@@ -285,5 +283,57 @@ public class CheckoutProService {
             return Integer.parseInt(inteiro + decimal);
         }
         return Integer.parseInt(cleaned) * 100;
+    }
+
+    private PricedSaleItem resolvePricedSaleItem(SaleItemRequest item, Sale sale, Product product) {
+        ProductVariation variation = null;
+        int unitPrice = product.getPrice();
+        int availableQuantity = product.getQuantity();
+        Integer promo = product.getPromo();
+
+        if (item.getVariationId() != null) {
+            variation = product.getVariations().stream()
+                    .filter(candidate -> item.getVariationId().equals(candidate.getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalArgumentException("Variação não encontrada: " + item.getVariationId()));
+            unitPrice = variation.getPrice();
+            availableQuantity = variation.getQuantity();
+            promo = variation.getPromo();
+        }
+
+        if (availableQuantity < item.getQuantity()) {
+            throw new IllegalArgumentException("Estoque insuficiente para " + product.getName());
+        }
+
+        int finalUnitPrice = applyPromo(unitPrice, promo);
+        return new PricedSaleItem(
+                getSaleItem(item, sale, product, variation, finalUnitPrice),
+                finalUnitPrice
+        );
+    }
+
+    private int applyPromo(int price, Integer promo) {
+        if (promo == null || promo <= 0) {
+            return price;
+        }
+        return BigDecimal.valueOf(price)
+                .multiply(BigDecimal.valueOf(100L - promo))
+                .divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP)
+                .intValue();
+    }
+
+    private void decrementStock(Sale sale) {
+        sale.getSaleItems().forEach(saleItem -> {
+            if (saleItem.getVariation() != null) {
+                ProductVariation variation = saleItem.getVariation();
+                variation.setQuantity(Math.max(variation.getQuantity() - saleItem.getQuantity(), 0));
+            } else {
+                saleItem.getProduct().updateQuantity(saleItem.getQuantity());
+            }
+            productDao.updateProduct(saleItem.getProduct());
+        });
+    }
+
+    private record PricedSaleItem(SaleItem saleItem, int unitPriceInCents) {
     }
 }

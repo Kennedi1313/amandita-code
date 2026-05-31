@@ -7,6 +7,8 @@ import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
@@ -73,6 +75,32 @@ public class FakeS3 implements S3Client {
             );
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public DeleteObjectResponse deleteObject(DeleteObjectRequest deleteObjectRequest)
+            throws AwsServiceException, SdkClientException {
+        File file = new File(
+                buildObjectFullPath(
+                        deleteObjectRequest.bucket(),
+                        deleteObjectRequest.key())
+        );
+        FileUtils.deleteQuietly(file);
+        deleteEmptyParents(file.getParentFile());
+        return DeleteObjectResponse.builder().build();
+    }
+
+    private void deleteEmptyParents(File directory) {
+        File root = new File(PATH);
+        while (directory != null && !directory.equals(root)) {
+            String[] children = directory.list();
+            if (children == null || children.length > 0) {
+                return;
+            }
+            File parent = directory.getParentFile();
+            FileUtils.deleteQuietly(directory);
+            directory = parent;
         }
     }
 

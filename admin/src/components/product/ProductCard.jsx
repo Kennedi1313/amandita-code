@@ -7,29 +7,25 @@ import {
   AlertDialogOverlay,
   Box,
   Button,
-  Center,
   Flex,
-  Heading,
+  HStack,
   Image,
   Stack,
   Tag,
   Text,
-  useColorModeValue,
   useDisclosure,
 } from "@chakra-ui/react";
-import { MdDelete, MdAddShoppingCart } from "react-icons/md";
 import { useRef } from "react";
 import {
-  productsPictureUrl,
   deleteProduct,
+  productsPictureUrl,
 } from "../../services/product-client.js";
 import {
   errorNotification,
   successNotification,
 } from "../../services/notification.js";
 import UpdateProductDrawer from "./UpdateProductDrawer.jsx";
-import { useShoppingFavorites } from "../../hooks/use-shopping-favorites.jsx";
-import { FiDelete, FiEdit, FiX } from "react-icons/fi";
+import { FiEdit, FiPackage, FiTrash2 } from "react-icons/fi";
 
 export default function CardWithImage({
   id,
@@ -39,81 +35,43 @@ export default function CardWithImage({
   category,
   quantity,
   description,
-  profileImageId,
   promo,
   variations,
   fetchProducts,
 }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { favoritesCount, addItemToFavorites, favoritesDetails, removeItem } =
-    useShoppingFavorites();
   const cancelRef = useRef();
 
-  const formatCurrency = (
-    amount = 0,
-    promo = 0,
-    parcelas = 1,
-    currency = "BRL",
-  ) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency,
-      minimumIntegerDigits: 2,
-    }).format(
-      (promo > 0 ? amount * (1 - promo / 100) : amount) / 100 / parcelas,
-    );
-  };
-
-  const addItemToCart = () => {
-    addItemToFavorites({
-      id: id.toString(),
-      name,
-      description,
-      price,
-      category,
-      stockQuantity: quantity,
-      profileImageId,
-      promo,
-    });
-  };
-
-  const removeItemFromCart = () => {
-    removeItem({
-      id: id.toString(),
-      name,
-      description,
-      price,
-      category,
-      stockQuantity: quantity,
-      profileImageId,
-      promo,
-    });
-  };
-
   return (
-    <Center py={4} w={"full"}>
-      <Stack
-        minW={{ base: "full", md: "250px" }}
-        w={"full"}
-        maxW={{ base: "full", md: "250px" }}
-        h={"400px"}
-        margin={0}
-        justifyContent={"space-between"}
-      >
-        <ImageSection
-          id={id}
-          profileImageId={profileImageId}
-          category={category}
-          quantity={quantity}
-          promo={promo}
-          variations={variations}
-        />
+    <Box
+      w="full"
+      bg="white"
+      border="1px solid"
+      borderColor="gray.100"
+      borderRadius="lg"
+      overflow="hidden"
+      boxShadow="sm"
+      transition="all 0.18s ease"
+      _hover={{ boxShadow: "md", borderColor: "#d8c9ff" }}
+    >
+      <ImageSection
+        id={id}
+        category={category}
+        quantity={quantity}
+        promo={promo}
+        variations={variations}
+      />
+
+      <Stack spacing={3} p={3} minH="170px">
         <ProductDetails
           name={name}
           price={price}
-          description={description}
           variations={variations}
+          quantity={quantity}
         />
+
+        <Box flex="1" />
+
         <ActionButtons
           id={id}
           name={name}
@@ -125,146 +83,155 @@ export default function CardWithImage({
           description={description}
           onOpen={onOpen}
           variations={variations}
-          removeItemFromCart={removeItemFromCart}
           fetchProducts={fetchProducts}
-          favoritesDetails={favoritesDetails}
           isOpen={isOpen}
           onClose={onClose}
           cancelRef={cancelRef}
-          formatCurrency={formatCurrency}
         />
       </Stack>
-    </Center>
+    </Box>
   );
 }
 
-const ImageSection = ({
-  id,
-  profileImageId,
-  category,
-  quantity,
-  promo,
-  variations,
-}) => {
+const ImageSection = ({ id, category, quantity, promo, variations }) => {
   const totalQuantity =
     variations && variations.length > 0
-      ? variations.reduce((acc, v) => acc + Number(v.quantity || 0), 0)
-      : Number(quantity);
+      ? variations.reduce((acc, variation) => acc + Number(variation.quantity || 0), 0)
+      : Number(quantity || 0);
 
   return (
-    <Box position="relative">
-      <Flex justify={"center"}>
-        <Image
-          w={"full"}
-          h={"238px"}
-          objectFit={"cover"}
-          src={`https://d26zivezixyii1.cloudfront.net/profile-images/${id}/${profileImageId}.jpg`}
-          alt={`${id} image`}
-        />
-      </Flex>
+    <Box position="relative" bg="gray.50">
+      <Image
+        w="full"
+        aspectRatio={1}
+        maxH="210px"
+        objectFit="cover"
+        src={productsPictureUrl(id)}
+        alt={`${id} image`}
+      />
 
       <Tag
         position="absolute"
-        top={"6px"}
+        top={2}
         left={2}
-        bg="#5f5482"
-        color="white"
-        fontWeight="bold"
+        bg="white"
+        color="#5f5482"
+        border="1px solid"
+        borderColor="#ebe5fc"
+        fontWeight="semibold"
         px={2}
         py={1}
+        borderRadius="full"
+        maxW="calc(100% - 72px)"
+        noOfLines={1}
       >
         {category}
       </Tag>
-
-      {promo > 0 && (
-        <Tag
-          position="absolute"
-          top={"36px"}
-          left={2}
-          bg="#5f5482"
-          color="white"
-          fontWeight="bold"
-          px={2}
-          py={1}
-        >
-          {promo}% OFF
-        </Tag>
-      )}
-
-      {variations.length > 0 && (
-        <Tag
-          position="absolute"
-          top={"66px"}
-          left={2}
-          bg="#5f5482"
-          color="white"
-          fontWeight="bold"
-          px={2}
-          py={1}
-        >
-          {variations.length} variações
-        </Tag>
-      )}
 
       <Tag
         position="absolute"
         top={2}
         right={2}
-        bg={totalQuantity > 0 ? "green.400" : "red.400"}
+        bg={totalQuantity > 0 ? "green.500" : "red.500"}
         color="white"
         fontWeight="bold"
         borderRadius="full"
-        px={3}
+        px={2.5}
+        py={1}
       >
-        {totalQuantity}
+        <HStack spacing={1}>
+          <FiPackage />
+          <Text as="span">{totalQuantity}</Text>
+        </HStack>
       </Tag>
+
+      <HStack position="absolute" bottom={2} left={2} right={2} spacing={2}>
+        {promo > 0 && (
+          <Tag bg="red.500" color="white" fontWeight="bold" borderRadius="full">
+            {promo}% OFF
+          </Tag>
+        )}
+
+        {variations?.length > 0 && (
+          <Tag
+            bg="purple.600"
+            color="white"
+            fontWeight="semibold"
+            borderRadius="full"
+          >
+            {variations.length} variações
+          </Tag>
+        )}
+      </HStack>
     </Box>
   );
 };
 
-const ProductDetails = ({ name, price, variations }) => {
+const ProductDetails = ({ name, price, variations, quantity }) => {
   const hasVariations = variations && variations.length > 0;
+  const totalQuantity = hasVariations
+    ? variations.reduce((acc, variation) => acc + Number(variation.quantity || 0), 0)
+    : Number(quantity || 0);
 
   const variationPriceText = hasVariations
     ? (() => {
         const prices = variations
-          .map((v) => parseFloat(v.price.replace(".", "").replace(",", ".")))
-          .filter((p) => p > 0);
+          .map((variation) =>
+            parseFloat(String(variation.price || "").replace(".", "").replace(",", ".")),
+          )
+          .filter((variationPrice) => variationPrice > 0);
+        if (prices.length === 0) return "0,00";
 
         const min = Math.min(...prices);
         const max = Math.max(...prices);
-
-        const format = (n) => n.toFixed(2).replace(".", ",");
+        const format = (value) => value.toFixed(2).replace(".", ",");
 
         return `${format(min)} ~ ${format(max)}`;
       })()
     : null;
 
   return (
-    <Box py={2} height={"full"} style={{ marginTop: 0 }}>
-      <Stack
-        spacing={2}
-        align={"center"}
-        justifyContent={"space-between"}
-        height={"full"}
+    <Stack spacing={2}>
+      <Text
+        fontSize="md"
+        lineHeight="short"
+        h="40px"
+        noOfLines={2}
+        fontWeight="semibold"
+        color="gray.900"
+        overflowWrap="anywhere"
+        wordBreak="break-word"
+        title={name}
+      >
+        {name}
+      </Text>
+
+      <Flex
+        align={{ base: "flex-start", sm: "center" }}
+        justify="space-between"
+        gap={3}
+        minH="34px"
       >
         <Text
-          fontSize={"lg"}
-          height={"3.3rem"}
-          overflow={"hidden"}
-          width={"full"}
-          fontWeight={500}
+          fontSize={{ base: "md", md: "md" }}
+          fontWeight="bold"
+          color="gray.900"
+          lineHeight="short"
+          whiteSpace="nowrap"
+          noOfLines={1}
         >
-          {name}
+          {hasVariations ? variationPriceText : price}
         </Text>
-
-        <Box display="flex" flexDirection="column" width={"full"}>
-          <Text fontSize="xl" fontWeight="semibold" color="gray.800">
-            {hasVariations ? variationPriceText : price}
-          </Text>
-        </Box>
-      </Stack>
-    </Box>
+        <Tag
+          size="sm"
+          borderRadius="full"
+          colorScheme={totalQuantity > 0 ? "green" : "red"}
+          flexShrink={0}
+        >
+          {totalQuantity > 0 ? "Em estoque" : "Sem estoque"}
+        </Tag>
+      </Flex>
+    </Stack>
   );
 };
 
@@ -279,19 +246,21 @@ const ActionButtons = ({
   description,
   onOpen,
   variations,
-  removeItemFromCart,
   fetchProducts,
-  favoritesDetails,
   isOpen,
   onClose,
   cancelRef,
-  formatCurrency,
 }) => (
   <>
-    <Flex direction={"row"} justify={"center"} gap={1} style={{ marginTop: 0 }}>
+    <Flex direction="row" justify="center" gap={2}>
       <UpdateProductDrawer
-        p={1}
-        w={"full"}
+        buttonProps={{
+          size: "sm",
+          colorScheme: "purple",
+          bg: "#5f5482",
+          leftIcon: <FiEdit />,
+          _hover: { bg: "#4f456e" },
+        }}
         initialValues={{
           id,
           name,
@@ -307,16 +276,15 @@ const ActionButtons = ({
         fetchProducts={fetchProducts}
       />
       <Button
+        size="sm"
         margin={0}
         colorScheme="red"
-        rounded={"md"}
-        width={"full"}
-        _hover={{
-          transform: "translateY(-2px)",
-          boxShadow: "lg",
-        }}
+        variant="outline"
+        rounded="md"
+        width="full"
+        _hover={{ bg: "red.50" }}
         onClick={onOpen}
-        leftIcon={<FiX />}
+        leftIcon={<FiTrash2 />}
       >
         Apagar
       </Button>
@@ -360,19 +328,26 @@ const DeleteAlertDialog = ({
           </Button>
           <Button
             colorScheme="red"
-            onClick={() => {
-              deleteProduct(id)
-                .then(() => {
-                  successNotification(
-                    "Produto deletado",
-                    `${name} foi deletado com sucesso.`,
-                  );
-                  fetchProducts();
-                })
-                .catch((err) => {
-                  errorNotification(err.code, err.response.data.message);
-                })
-                .finally(onClose);
+            onClick={async () => {
+              try {
+                await deleteProduct(id);
+                successNotification(
+                  "Produto deletado",
+                  `${name} foi deletado com sucesso.`,
+                );
+                try {
+                  await fetchProducts();
+                } catch (err) {
+                  console.error(err);
+                }
+              } catch (err) {
+                errorNotification(
+                  err.code || "Erro",
+                  err.response?.data?.message || "Falha ao deletar o produto",
+                );
+              } finally {
+                onClose();
+              }
             }}
             ml={3}
           >

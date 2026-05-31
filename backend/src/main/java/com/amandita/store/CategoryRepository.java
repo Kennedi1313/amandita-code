@@ -13,4 +13,8 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
 
     @Query("select c from Category c where c.store.id = ?1")
     List<Category> findAllByStoreId(Long storeId);
+
+    boolean existsByStoreIdAndPath(Long storeId, String path);
+
+    boolean existsByStoreIdAndNameIgnoreCase(Long storeId, String name);
 }

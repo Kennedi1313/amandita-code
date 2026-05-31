@@ -57,6 +57,14 @@ public class CustomerService {
                 ));
     }
 
+    public CustomerDTO getCustomerByIdAndStore(Integer id, Long storeId) {
+        return customerDao.selectCustomerByIdAndStore(id, storeId)
+                .map(customerDTOMapper)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "customer with id [%s] not found in this store".formatted(id)
+                ));
+    }
+
     public CustomerDTO getCustomerByEmailByStore(String email, Long storeId) {
         return customerDao.selectUserByEmailByStore(email, storeId)
                 .map(customerDTOMapper)
@@ -96,30 +104,40 @@ public class CustomerService {
                 customerRegistrationRequest.reference()
         );
 
-        // add
         Customer customer = new Customer(
                 customerRegistrationRequest.name(),
                 customerRegistrationRequest.email(),
                 customerRegistrationRequest.password() != null ?
-                    passwordEncoder.encode(customerRegistrationRequest.password()) :
-                            null,
+                        passwordEncoder.encode(customerRegistrationRequest.password()) :
+                        null,
                 customerRegistrationRequest.age() != null ?
-                    customerRegistrationRequest.age() : 18,
+                        customerRegistrationRequest.age() : 18,
                 customerRegistrationRequest.gender() != null ?
-                    customerRegistrationRequest.gender() : Gender.FEMALE,
+                        customerRegistrationRequest.gender() : Gender.FEMALE,
                 customerRegistrationRequest.phone(),
                 customerRegistrationRequest.cpf());
         customer.addAddress(address);
 
         Store store = storeDao.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Loja nao identificada"));
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
         customer.setStore(store);
 
-        return customerDao.insertCustomer(customer);
+        Customer savedCustomer = customerDao.insertCustomer(customer);
+        customerDao.addRoleToCustomerInStore(savedCustomer, storeId, "ROLE_USER");
+        savedCustomer.setEffectiveRoles(customerDao.selectRolesByCustomerAndStore(savedCustomer.getId(), storeId));
+        return savedCustomer;
     }
 
     public void deleteCustomerById(Integer customerId) {
         checkIfCustomerExistsOrThrow(customerId);
+        customerDao.deleteCustomerById(customerId);
+    }
+
+    public void deleteCustomerByIdAndStore(Integer customerId, Long storeId) {
+        customerDao.selectCustomerByIdAndStore(customerId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "customer with id [%s] not found in this store".formatted(customerId)
+                ));
         customerDao.deleteCustomerById(customerId);
     }
 
@@ -146,13 +164,17 @@ public class CustomerService {
             changes = true;
         }
 
-        if (updateRequest.age() != null && !updateRequest.age().equals(customer.getAge())) {
-            customer.setAge(updateRequest.age());
+        if (updateRequest.email() != null && !updateRequest.email().equals(customer.getEmail())) {
+            Long storeId = customer.getStore() != null ? customer.getStore().getId() : null;
+            if (storeId != null && customerDao.existsCustomerByEmailByStoreExcludingId(updateRequest.email(), storeId, customerId)) {
+                throw new DuplicateResourceException("Já existe um usuário cadastrado com esse email.");
+            }
+            customer.setEmail(updateRequest.email().trim().toLowerCase());
             changes = true;
         }
 
-        if(updateRequest.role() != null && !customer.getRoles().contains(updateRequest.role())) {
-            customer.getRoles().add(updateRequest.role());
+        if (updateRequest.age() != null && !updateRequest.age().equals(customer.getAge())) {
+            customer.setAge(updateRequest.age());
             changes = true;
         }
 
@@ -166,7 +188,11 @@ public class CustomerService {
             changes = true;
         }
 
-        Address address = customer.getAddresses().stream().findFirst().orElseThrow(null);
+        Address address = customer.getAddresses().stream().findFirst().orElseGet(() -> {
+            Address newAddress = new Address("", "", 0L, "", "", "");
+            customer.addAddress(newAddress);
+            return newAddress;
+        });
 
         if (updateRequest.zip() != null && !updateRequest.zip().equals(address.getZip())) {
             address.setZip(updateRequest.zip());
@@ -240,4 +266,3 @@ public class CustomerService {
         return profileImage;
     }
 }
-

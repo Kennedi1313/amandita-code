@@ -3,15 +3,16 @@ package com.amandita.product;
 import com.amandita.Sale.Sale;
 import com.amandita.Sale.SaleRequest;
 import com.amandita.Sale.SaleResponse;
+import com.amandita.customer.Customer;
+import com.amandita.customer.CustomerDTOMapper;
 import com.amandita.jwt.JWTUtil;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -47,6 +48,14 @@ public class ProductController {
 
     @GetMapping("{productId}")
     public ProductDTO getProduct(
+            @PathVariable("productId") Integer productId,
+            HttpServletRequest httpRequest
+    ) {
+        return productService.getProductByIdAndStore(productId, (Long) httpRequest.getAttribute("storeId"));
+    }
+
+    @GetMapping("{productId}/no-store")
+    public ProductDTO getProductNoStore(
             @PathVariable("productId") Integer productId
     ) {
         return productService.getProductById(productId);
@@ -90,8 +99,9 @@ public class ProductController {
     )
     public void uploadProductProfileImage(
             @PathVariable("productId") Integer productId,
-            @RequestParam("file") MultipartFile file) {
-        productService.updateProductProfileImage(productId, file);
+            @RequestParam("file") MultipartFile file,
+            HttpServletRequest httpRequest) {
+        productService.updateProductProfileImage(productId, file, (Long) httpRequest.getAttribute("storeId"));
     }
 
     @PostMapping(value = "/with-images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -104,10 +114,10 @@ public class ProductController {
 
         Integer productId = productService.addProduct(productRequest, storeId);
 
-        productService.updateProductImages(productId, files, new ArrayList<>());
+        productService.updateProductImages(productId, files, new ArrayList<>(), storeId);
 
         if ("variable".equalsIgnoreCase(productRequest.productType()) && productRequest.variations() != null) {
-            productService.addProductVariations(productId, productRequest);
+            productService.addProductVariations(productId, productRequest, storeId);
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(productId);
@@ -118,45 +128,49 @@ public class ProductController {
             produces = MediaType.IMAGE_JPEG_VALUE
     )
     public byte[] getProductProfileImage(
-            @PathVariable("productId") Integer productId) {
-        return productService.getProductProfileImage(productId);
+            @PathVariable("productId") Integer productId,
+            @RequestParam(value = "imageId", required = false) String imageId,
+            HttpServletRequest httpRequest) {
+        return productService.getProductProfileImage(productId, imageId, (Long) httpRequest.getAttribute("storeId"));
     }
 
     @DeleteMapping("{productId}")
     public void deleteProductById(
-            @PathVariable("productId") Integer productId) {
-        productService.deleteProductById(productId);
+            @PathVariable("productId") Integer productId,
+            HttpServletRequest httpRequest) {
+        productService.deleteProductById(productId, (Long) httpRequest.getAttribute("storeId"));
     }
 
     @PutMapping(value = "{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public void updateProduct(
             @PathVariable("productId") Integer productId,
             @RequestPart("product") ProductUpdateRequest productUpdateRequest,
-            @RequestPart(value = "files", required = false) List<MultipartFile> files
+            @RequestPart(value = "files", required = false) List<MultipartFile> files,
+            HttpServletRequest httpRequest
     ) {
-        productService.updateProduct(productId, productUpdateRequest);
+        Long storeId = (Long) httpRequest.getAttribute("storeId");
+        productService.updateProduct(productId, productUpdateRequest, storeId);
 
-        List<String> imagesToDelete = productUpdateRequest.imagesToDelete();
+        List<String> imagesToDelete = productUpdateRequest.imagesToDelete() == null
+                ? List.of()
+                : productUpdateRequest.imagesToDelete();
         if (files == null) {
             files = new ArrayList<>();
         }
 
-        productService.updateProductImages(productId, files, imagesToDelete);
+        productService.updateProductImages(productId, files, imagesToDelete, storeId);
     }
 
     @GetMapping("{productId}/images")
-    public ResponseEntity<List<ProductImageDTO>> getImagesByProductId(@PathVariable("productId") Integer productId) {
+    public ResponseEntity<List<ProductImageDTO>> getImagesByProductId(@PathVariable("productId") Integer productId,
+                                                                      HttpServletRequest httpRequest) {
+        productService.requireProductByIdAndStore(productId, (Long) httpRequest.getAttribute("storeId"));
         return ResponseEntity.ok(productImageService.getImageUrlsByProductId(productId));
     }
 
     @PostMapping("/sell")
-    public ResponseEntity<Sale> sellProducts(@RequestBody SaleRequest saleRequest, HttpServletRequest httpRequest) {
-        try {
-            Sale sale = productService.processSale(saleRequest, (Long) httpRequest.getAttribute("storeId"));
-            return ResponseEntity.ok(sale);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<Void> sellProducts(@RequestBody SaleRequest saleRequest) {
+        return ResponseEntity.status(HttpStatus.GONE).build();
     }
 
     @GetMapping("/sales")
@@ -166,24 +180,45 @@ public class ProductController {
     }
 
     @GetMapping("/sales/email/{email}")
-    public ResponseEntity<Page<Sale>> getSalesByCustomerEmail(@PathVariable("email") String email) {
-        Page<Sale> sales = productService.getSalesByCustomerEmail(email);
+    public ResponseEntity<Page<SaleResponse>> getSalesByCustomerEmail(@PathVariable("email") String email,
+                                                                      HttpServletRequest httpRequest,
+                                                                      Authentication authentication) {
+        assertSelfOrAdmin(email, authentication);
+        Page<SaleResponse> sales = productService.getSalesByCustomerEmail(email, (Long) httpRequest.getAttribute("storeId"));
         return ResponseEntity.ok(sales);
     }
 
     @GetMapping("/sales/{saleId}")
-    public ResponseEntity<Sale> getSaleById(@PathVariable("saleId") String saleId) {
-        Sale sale = productService.getSaleById(Long.valueOf(saleId));
+    public ResponseEntity<Sale> getSaleById(@PathVariable("saleId") String saleId, HttpServletRequest httpRequest) {
+        Sale sale = productService.getSaleById(Long.valueOf(saleId), (Long) httpRequest.getAttribute("storeId"));
         return ResponseEntity.ok(sale);
     }
 
     @PostMapping("/sales")
-    public ResponseEntity<Sale> updateSales(@RequestBody String details) throws JsonProcessingException {
-        System.out.println(details);
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode jsonNode = objectMapper.readTree(details);
-        Sale sale = productService.updateSaleStatus(jsonNode.get("saleId").asLong(),
-                jsonNode.get("status").asText());
-        return ResponseEntity.ok(sale);
+    public ResponseEntity<SaleResponse> updateSales(@RequestBody SaleStatusUpdateRequest details,
+                                                    HttpServletRequest httpRequest) {
+        Sale sale = productService.updateSaleStatus(details.saleId(), details.status(), (Long) httpRequest.getAttribute("storeId"));
+        return ResponseEntity.ok(
+                SaleResponse.fromEntity(sale, new ProductDTOMapper(), new CustomerDTOMapper())
+        );
+    }
+
+    private void assertSelfOrAdmin(String email, Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new AccessDeniedException("Acesso negado.");
+        }
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+        if (isAdmin) {
+            return;
+        }
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof Customer customer && email.equalsIgnoreCase(customer.getEmail())) {
+            return;
+        }
+        throw new AccessDeniedException("Acesso negado.");
+    }
+
+    private record SaleStatusUpdateRequest(Long saleId, String status) {
     }
 }

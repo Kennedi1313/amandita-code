@@ -13,6 +13,7 @@ public class Store {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String name;
+    @Column(unique = true)
     private String domain;
     private String logoUrl;
     private String bannerUrl;
@@ -24,6 +25,12 @@ public class Store {
     private String melhorEnvioRefreshToken;
     private String instagram;
     private String whatsapp;
+    private Boolean pickupEnabled = true;
+    private Boolean localDeliveryEnabled = true;
+    private Integer localDeliveryFee = 0;
+    private Integer freeShippingMinAmount = 0;
+    private String shippingOriginZip;
+    private String localDeliveryEta;
     private java.sql.Timestamp createdAt;
     private java.sql.Timestamp updatedAt;
 
@@ -31,7 +38,7 @@ public class Store {
     @JsonManagedReference
     private List<Category> categories;
 
-    private Store() {}
+    public Store() {}
 
     public Long getId() {
         return id;
@@ -127,6 +134,54 @@ public class Store {
 
     public void setWhatsapp(String whatsapp) {
         this.whatsapp = whatsapp;
+    }
+
+    public Boolean getPickupEnabled() {
+        return pickupEnabled;
+    }
+
+    public void setPickupEnabled(Boolean pickupEnabled) {
+        this.pickupEnabled = pickupEnabled;
+    }
+
+    public Boolean getLocalDeliveryEnabled() {
+        return localDeliveryEnabled;
+    }
+
+    public void setLocalDeliveryEnabled(Boolean localDeliveryEnabled) {
+        this.localDeliveryEnabled = localDeliveryEnabled;
+    }
+
+    public Integer getLocalDeliveryFee() {
+        return localDeliveryFee;
+    }
+
+    public void setLocalDeliveryFee(Integer localDeliveryFee) {
+        this.localDeliveryFee = localDeliveryFee;
+    }
+
+    public Integer getFreeShippingMinAmount() {
+        return freeShippingMinAmount;
+    }
+
+    public void setFreeShippingMinAmount(Integer freeShippingMinAmount) {
+        this.freeShippingMinAmount = freeShippingMinAmount;
+    }
+
+    public String getShippingOriginZip() {
+        return shippingOriginZip;
+    }
+
+    public void setShippingOriginZip(String shippingOriginZip) {
+        this.shippingOriginZip = shippingOriginZip;
+    }
+
+    public String getLocalDeliveryEta() {
+        return localDeliveryEta;
+    }
+
+    public void setLocalDeliveryEta(String localDeliveryEta) {
+        this.localDeliveryEta = localDeliveryEta;
     }
 
     public Timestamp getCreatedAt() {

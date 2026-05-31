@@ -19,7 +19,7 @@ public class SaleJPADataAccessService implements SaleDao {
     @Override
     public Page<Sale> selectAllSales(int page, int size, Long storeId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return saleRepository.findByExcludedStatus("PENDENTE", storeId, pageable);
+        return saleRepository.findAllByStoreId(storeId, pageable);
     }
 
     @Override
@@ -31,8 +31,24 @@ public class SaleJPADataAccessService implements SaleDao {
         return this.saleRepository.findById(id);
     }
 
-    public Page<Sale> findByUserEmail(String email) {
+    public Optional<Sale> findByIdAndStoreId(Long id, Long storeId) {
+        return this.saleRepository.findByIdAndStoreId(id, storeId);
+    }
+
+    public Optional<Sale> findByPreferenceId(String preferenceId) {
+        return this.saleRepository.findByPreferenceId(preferenceId);
+    }
+
+    public Optional<Sale> findByIdForUpdate(Long id) {
+        return this.saleRepository.findByIdForUpdate(id);
+    }
+
+    public Optional<Sale> findByPreferenceIdForUpdate(String preferenceId) {
+        return this.saleRepository.findByPreferenceIdForUpdate(preferenceId);
+    }
+
+    public Page<Sale> findByUserEmail(String email, Long storeId) {
         Pageable pageable = PageRequest.of(0, 100, Sort.by(Sort.Direction.DESC, "id"));
-        return this.saleRepository.findAllByUserEmail(email, pageable);
+        return this.saleRepository.findAllByUserEmailAndStoreId(email, storeId, pageable);
     }
 }

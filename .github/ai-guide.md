@@ -7,6 +7,7 @@ This file is intended to help AI assistants and agents understand the structure,
 Amandita is a small monorepo containing:
 
 - `admin/` — React/Vite admin dashboard
+- `portal/` — React/Vite SaaS portal and store signup flow
 - `frontend/` — Next.js storefront
 - `backend/` — Spring Boot API service
 - `db/` — PostgreSQL container support
@@ -17,6 +18,7 @@ The repository is intentionally kept in a single GitHub repo because the service
 ## Service boundaries
 
 - `admin/` is the internal admin application.
+- `portal/` is the public SaaS portal and onboarding entry point.
 - `frontend/` is the public customer-facing storefront.
 - `backend/` is the API and business logic layer.
 - `db/` contains the container definition and storage volume configuration for PostgreSQL.
@@ -31,6 +33,7 @@ The main local runtime is defined in `docker-compose.yml`:
 - `amandita-api` builds from `backend/Dockerfile`
 - `amandita-admin` builds from `admin/Dockerfile`
 - `amandita-frontend` builds from `frontend/Dockerfile`
+- `amandita-portal` builds from `portal/Dockerfile`
 
 Run everything locally with:
 
@@ -82,12 +85,23 @@ npm install
 npm run dev
 ```
 
+### SaaS portal
+
+Install and run:
+
+```bash
+cd portal
+npm install
+npm run dev
+```
+
 ## Key files and locations
 
 - `docker-compose.yml` — orchestrates all services
 - `backend/pom.xml` — Java dependencies and build configuration
 - `backend/Dockerfile` — backend build/runtime containers
 - `admin/package.json` — admin app dependencies and scripts
+- `portal/package.json` — portal app dependencies and scripts
 - `frontend/package.json` — storefront dependencies and scripts
 - `backend/src/main/java` — backend source code
 - `frontend/pages` — storefront routes and pages
@@ -99,8 +113,12 @@ npm run dev
 - The backend API port is `8080`.
 - The storefront runs on `3000` in local development.
 - The admin frontend runs on `4173` in local development.
+- The SaaS portal runs on `5174` in local development.
 - Docker Compose names services: `amandita-db`, `amandita-api`, `amandita-admin`, `amandita-frontend`, and `cloudflared`.
 - The backend container expects the database at `jdbc:postgresql://db:5432/amandita`.
+- Domain topology is centralized for admin/API: the admin app is shared, the backend API is shared, and only storefront domains vary by store.
+- Storefront requests identify the current store with `X-Store-Domain`; authenticated admin requests identify the store with the JWT `storeId`.
+- Do not add per-store admin/API host assumptions such as `admin.{storeDomain}` or `api.{storeDomain}`.
 
 ## Guidance for agents
 

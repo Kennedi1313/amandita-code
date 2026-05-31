@@ -1,8 +1,9 @@
 import axios from "axios";
-import { getUrl } from "./client";
+import { getStoreConfig, getStoreDomain, getStoreHeaders, getUrl } from "./client";
 
 const getAuthConfig = () => ({
   headers: {
+    ...getStoreHeaders(),
     Authorization: `Bearer ${localStorage.getItem("access_token")}`,
   },
 });
@@ -11,6 +12,7 @@ export const getProducts = async (currentPage) => {
   try {
     return await axios.get(
       `${getUrl()}/api/v1/products?page=${currentPage}&size=${8}`,
+      getStoreConfig(),
     );
   } catch (e) {
     throw e;
@@ -19,7 +21,7 @@ export const getProducts = async (currentPage) => {
 
 export const getSales = async () => {
   try {
-    return await axios.get(`${getUrl()}/api/v1/products/sales`);
+    return await axios.get(`${getUrl()}/api/v1/products/sales`, getStoreConfig());
   } catch (e) {
     throw e;
   }
@@ -39,7 +41,23 @@ export const getProductsByCategory = async (category, currentPage) => {
   try {
     return await axios.get(
       `${getUrl()}/api/v1/products/by-category?category=${category}&page=${currentPage}&size=${8}`,
+      getStoreConfig(),
     );
+  } catch (e) {
+    throw e;
+  }
+};
+
+export const getProductsByName = async (query, currentPage) => {
+  try {
+    return await axios.get(`${getUrl()}/api/v1/products/by-name`, {
+      headers: getStoreConfig().headers,
+      params: {
+        query,
+        page: currentPage,
+        size: 8,
+      },
+    });
   } catch (e) {
     throw e;
   }
@@ -47,7 +65,10 @@ export const getProductsByCategory = async (category, currentPage) => {
 
 export const fetchCustomerByCPF = async (cpf) => {
   try {
-    return await axios.get(`${getUrl()}/api/v1/customers/cpf/${cpf}`);
+    return await axios.get(
+      `${getUrl()}/api/v1/customers/cpf/${cpf}`,
+      getStoreConfig(),
+    );
   } catch (e) {
     throw e;
   }
@@ -87,16 +108,13 @@ export const saveProduct = async (product, image) => {
 
 export const saveProductMultiImage = async (formData) => {
   try {
-    // Faz a requisição única para o endpoint que lida tanto com o cadastro do produto
-    // quanto com o upload das imagens
-    console.log("savprodcutMultiImage called");
-    console.log(formData);
     const response = await axios.post(
       `${getUrl()}/api/v1/products/with-images`,
       formData,
       {
         ...getAuthConfig(),
         headers: {
+          ...getAuthConfig().headers,
           "Content-Type": "multipart/form-data",
         },
       },
@@ -110,7 +128,6 @@ export const saveProductMultiImage = async (formData) => {
 
 export const updateProduct = async (id, update) => {
   try {
-    console.log(update);
     return await axios.put(`${getUrl()}/api/v1/products/${id}`, update, {
       ...getAuthConfig(),
       "Content-Type": "multipart/form-data",
@@ -146,11 +163,32 @@ export const uploadProductPicture = async (id, formData) => {
 
 export const getProductImagesById = async (id) => {
   try {
-    return axios.get(`${getUrl()}/api/v1/products/${id}/images`);
+    const response = await axios.get(
+      `${getUrl()}/api/v1/products/${id}/images`,
+      getStoreConfig(),
+    );
+    return {
+      ...response,
+      data: response.data.map((image) => ({
+        ...image,
+        url: productsPictureUrl(id, image.id),
+      })),
+    };
   } catch (e) {
     throw e;
   }
 };
 
-export const productsPictureUrl = (id) =>
-  `${getUrl()}/api/v1/products/${id}/profile-image`;
+export const productsPictureUrl = (id, imageId) => {
+  const params = new URLSearchParams();
+  const storeDomain = getStoreDomain();
+  if (imageId) {
+    params.set("imageId", imageId);
+  }
+  if (storeDomain) {
+    params.set("storeDomain", storeDomain);
+  }
+
+  const query = params.toString();
+  return `${getUrl()}/api/v1/products/${id}/profile-image${query ? `?${query}` : ""}`;
+};

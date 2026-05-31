@@ -1,6 +1,7 @@
 package com.amandita.product;
 
 import com.vladmihalcea.hibernate.type.json.JsonBinaryType;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.hibernate.annotations.Type;
 
@@ -16,6 +17,7 @@ public class ProductVariation {
 
     @ManyToOne
     @JoinColumn(name = "product_id")
+    @JsonIgnore
     private Product product;
 
     private String sku;

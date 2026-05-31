@@ -4,9 +4,7 @@ import { toast } from "react-hot-toast";
 import { cepMask, cpfMask, phoneMask } from "@/lib/utils";
 import Link from "next/link";
 import { BsArrowLeft, BsArrowRight } from "react-icons/bs";
-import { AxiosError } from "axios";
 import { TextInput } from "./textInput";
-import { useAuth } from "./Context/authContext";
 import { FiTruck, FiUser } from "react-icons/fi";
 
 const CreateCustomerForm = ({
@@ -15,7 +13,6 @@ const CreateCustomerForm = ({
   validationSchema,
   newCustomer,
 }: any) => {
-  const { logOut } = useAuth();
   const getAddress = (cep: string, e: any, setFieldValue: any) => {
     e.preventDefault();
     findAddressByCep(cep)
@@ -68,7 +65,6 @@ const CreateCustomerForm = ({
                   label="CPF"
                   name="cpf"
                   type="text"
-                  disabled={!newCustomer}
                   onChange={(e: any) =>
                     setFieldValue("cpf", cpfMask(e.target.value))
                   }
@@ -131,12 +127,6 @@ const CreateCustomerForm = ({
                   disabled={!isValid}
                 >
                   Atualizar dados
-                </button>
-                <button
-                  className="w-full md:w-fit flex justify-around px-5 py-3 md:mt-8 text-black-1000 font-bold text-center"
-                  onClick={logOut}
-                >
-                  Sair da sua conta
                 </button>
               </div>
             )}

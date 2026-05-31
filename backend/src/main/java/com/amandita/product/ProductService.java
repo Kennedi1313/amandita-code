@@ -3,7 +3,9 @@ package com.amandita.product;
 import com.amandita.Sale.*;
 import com.amandita.customer.CustomerDTOMapper;
 import com.amandita.customer.CustomerDao;
+import com.amandita.exception.ResourceConflictException;
 import com.amandita.exception.ResourceNotFoundException;
+import com.amandita.exception.RequestValidationException;
 import com.amandita.s3.S3Buckets;
 import com.amandita.s3.S3Service;
 import com.amandita.store.Store;
@@ -78,14 +80,25 @@ public class ProductService {
                 ));
     }
 
+    public ProductDTO getProductByIdAndStore(Integer productId, Long storeId) {
+        return productDTOMapper.apply(requireProductByIdAndStore(productId, storeId));
+    }
+
+    public Product requireProductByIdAndStore(Integer productId, Long storeId) {
+        return productDao.selectProductByIdAndStore(productId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "produto com id [%s] não encontrado nesta loja".formatted(productId)
+                ));
+    }
+
     public Integer addProduct(ProductRegistrationRequest productRegistrationRequest, Long storeId) {
         Store store = storeDao.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Loja nao identificada"));
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
         Product product = new Product(
                 productRegistrationRequest.name(),
                 productRegistrationRequest.description(),
                 0,
-                Integer.valueOf(productRegistrationRequest.price().replace(",", "")),
+                parseBrazilianPrice(productRegistrationRequest.price()),
                 productRegistrationRequest.quantity(),
                 productRegistrationRequest.category(),
                 productRegistrationRequest.profileImageId(),
@@ -97,11 +110,8 @@ public class ProductService {
     }
 
     @Transactional
-    public void addProductVariations(Integer productId, ProductRegistrationRequest productRequest) {
-        Product product = productDao.selectProductById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Product with id [%s] not found".formatted(productId)
-                ));
+    public void addProductVariations(Integer productId, ProductRegistrationRequest productRequest, Long storeId) {
+        Product product = requireProductByIdAndStore(productId, storeId);
 
         if (productRequest.variations() != null) {
             List<ProductVariation> newVariations = productRequest.variations().stream()
@@ -110,7 +120,7 @@ public class ProductService {
                         pv.setProduct(product);
                         pv.setSku(generateSku(product.getName(), comboDto.options()));
                         pv.setPrice(parseBrazilianPrice(comboDto.price()));
-                        pv.setQuantity(Integer.valueOf(comboDto.quantity()));
+                        pv.setQuantity(parseInteger(comboDto.quantity()));
                         pv.setPromo(comboDto.promo());
                         pv.setOptions(comboDto.options());
                         return pv;
@@ -154,11 +164,8 @@ public class ProductService {
         return base;
     }
 
-    public void updateProduct(Integer productId, ProductUpdateRequest req) {
-        Product product = productDao.selectProductById(productId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "product with id [%s] not found".formatted(productId)
-                ));
+    public void updateProduct(Integer productId, ProductUpdateRequest req, Long storeId) {
+        Product product = requireProductByIdAndStore(productId, storeId);
 
         if (!product.getName().equals(req.name()))
             product.setName(req.name());
@@ -168,7 +175,7 @@ public class ProductService {
 
         product.setOriginalPrice(0);
 
-        Integer parsedPrice = Integer.valueOf(req.price().replace(",", ""));
+        Integer parsedPrice = parseBrazilianPrice(req.price());
         if (!product.getPrice().equals(parsedPrice))
             product.setPrice(parsedPrice);
 
@@ -181,30 +188,69 @@ public class ProductService {
         if (req.promo() != null && !req.promo().equals(product.getPromo()))
             product.setPromo(req.promo());
 
-        // --- Atualizar variations ---
         if (req.variations() != null) {
-            product.getVariations().clear();
-
-            List<ProductVariation> newVariations = req.variations().stream()
-                    .map(comboDto -> {
-                        ProductVariation pv = new ProductVariation();
-                        pv.setProduct(product);
-                        pv.setOptions(comboDto.options());
-                        pv.setSku(comboDto.sku());
-                        pv.setPrice(parseBrazilianPrice(comboDto.price()));
-                        pv.setQuantity(Integer.valueOf(comboDto.quantity()));
-                        pv.setPromo(comboDto.promo());
-                        return pv;
-                    }).toList();
-
-            product.getVariations().addAll(newVariations);
+            syncProductVariations(product, req.variations());
         }
 
         productDao.updateProduct(product);
     }
 
+    private void syncProductVariations(Product product, List<ProductVariationDTO> variationRequests) {
+        Map<Integer, ProductVariation> existingById = product.getVariations().stream()
+                .filter(variation -> variation.getId() != null)
+                .collect(Collectors.toMap(ProductVariation::getId, variation -> variation));
+        Set<Integer> incomingIds = variationRequests.stream()
+                .map(ProductVariationDTO::id)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        for (ProductVariationDTO comboDto : variationRequests) {
+            ProductVariation variation = comboDto.id() != null ? existingById.get(comboDto.id()) : null;
+            if (variation == null) {
+                variation = new ProductVariation();
+                variation.setProduct(product);
+                product.getVariations().add(variation);
+            }
+
+            applyVariationData(product, variation, comboDto);
+        }
+
+        Iterator<ProductVariation> iterator = product.getVariations().iterator();
+        while (iterator.hasNext()) {
+            ProductVariation existingVariation = iterator.next();
+            Integer variationId = existingVariation.getId();
+            if (variationId == null || incomingIds.contains(variationId)) {
+                continue;
+            }
+
+            if (productDao.existsSaleItemByVariationId(variationId)) {
+                existingVariation.setQuantity(0);
+            } else {
+                iterator.remove();
+            }
+        }
+    }
+
+    private void applyVariationData(Product product, ProductVariation variation, ProductVariationDTO comboDto) {
+        variation.setProduct(product);
+        variation.setOptions(comboDto.options());
+        variation.setSku(StringUtils.isNotBlank(comboDto.sku()) ? comboDto.sku() : generateSku(product.getName(), comboDto.options()));
+        variation.setPrice(parseBrazilianPrice(comboDto.price()));
+        variation.setQuantity(parseInteger(comboDto.quantity()));
+        variation.setPromo(comboDto.promo());
+    }
+
+    private Integer parseInteger(String value) {
+        if (StringUtils.isBlank(value)) {
+            return 0;
+        }
+        return Integer.parseInt(value.replaceAll("[^0-9]", ""));
+    }
+
     public void updateProductProfileImage(Integer productId,
-                                          MultipartFile file) {
+                                          MultipartFile file,
+                                          Long storeId) {
+        requireProductByIdAndStore(productId, storeId);
         String profileImageId = UUID.randomUUID().toString();
         try {
             s3Service.putObject(
@@ -218,7 +264,8 @@ public class ProductService {
         productDao.updateProductImageId(profileImageId, productId);
     }
 
-    public void updateProductImages(Integer productId, List<MultipartFile> files, @NotNull List<String> imagesToDelete) {
+    public void updateProductImages(Integer productId, List<MultipartFile> files, @NotNull List<String> imagesToDelete, Long storeId) {
+        requireProductByIdAndStore(productId, storeId);
         // 1. Remove imagens antigas se solicitado
         for (String imageId : imagesToDelete) {
             s3Service.deleteObject(
@@ -262,53 +309,57 @@ public class ProductService {
         if(!imageIds.isEmpty()) {
             // Adiciona a ultima imagem como profile image do produto
             productDao.updateProductImageId(imageIds.get(imageIds.size() - 1), productId);
+        } else {
+            productDao.updateProductImageId(null, productId);
         }
     }
 
-    public byte[] getProductProfileImage(Integer productId) {
-        ProductDTO productDTO = productDao.selectProductById(productId)
-                .map(productDTOMapper)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "product with id [%s] not found".formatted(productId)
-                ));
-        if (StringUtils.isBlank(productDTO.profileImageId())) {
+    public byte[] getProductProfileImage(Integer productId, String imageId, Long storeId) {
+        ProductDTO productDTO = productDTOMapper.apply(requireProductByIdAndStore(productId, storeId));
+        String selectedImageId = StringUtils.isNotBlank(imageId) ? imageId : productDTO.profileImageId();
+
+        if (StringUtils.isBlank(selectedImageId)) {
             throw new ResourceNotFoundException(
                     "product with id [%s] profile image not found".formatted(productId));
         }
 
         return s3Service.getObject(
                 s3Buckets.getProduct(),
-                "profile-images/%s/%s.jpg".formatted(productId, productDTO.profileImageId())
+                "profile-images/%s/%s.jpg".formatted(productId, selectedImageId)
         );
     }
 
-    public void deleteProductById(Integer productId) {
-        // Verifica se o produto existe
-        productDao.selectProductById(productId)
-                .map(productDTOMapper)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "product with id [%s] not found".formatted(productId)
-                ));
+    public void deleteProductById(Integer productId, Long storeId) {
+        Product product = requireProductByIdAndStore(productId, storeId);
 
-        // Recupera todas as imagens associadas ao produto
-        List<String> imageIds = productDao.selectAllImageIdsByProductId(productId);
+        if (productDao.existsSaleItemByProductId(productId) || productDao.existsHistoryByProductId(productId)) {
+            throw new ResourceConflictException(
+                    "Não é possível deletar este produto porque ele já está vinculado à venda ou histórico."
+            );
+        }
 
-        // Deleta todas as imagens do S3
+        // Recupera todas as imagens associadas ao produto antes do banco remover os vinculos.
+        Set<String> imageIds = new LinkedHashSet<>(productDao.selectAllImageIdsByProductId(productId));
+        if (StringUtils.isNotBlank(product.getProfileImageId())) {
+            imageIds.add(product.getProfileImageId());
+        }
+
+        // Remove o produto do banco primeiro. Se houver alguma restricao, as imagens continuam preservadas.
+        productDao.deleteProductById(productId);
+
+        // Deleta todas as imagens do S3 depois que o banco confirma a remocao.
         for (String imageId : imageIds) {
             s3Service.deleteObject(
                     s3Buckets.getProduct(),
                     "profile-images/%s/%s.jpg".formatted(productId, imageId)
             );
         }
-
-        // Remove o produto do banco
-        productDao.deleteProductById(productId);
     }
 
     @Transactional
     public Sale processSale(SaleRequest saleRequest, Long storeId) {
         Store store = storeDao.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Loja nao identificada"));
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
         Sale sale = new Sale();
         List<SaleItem> saleItems = new ArrayList<>();
         double totalPrice = 0.0;
@@ -317,23 +368,37 @@ public class ProductService {
             Product product = productDao.selectProductById(request.getProductId())
                     .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + request.getProductId()));
 
-            if (product.getQuantity() < request.getQuantity()) {
-                throw new IllegalArgumentException("Insufficient stock for product: " + product.getName());
+            ProductVariation variation = null;
+            Integer unitPrice = product.getPrice();
+            if (request.getVariationId() != null) {
+                variation = product.getVariations().stream()
+                        .filter(item -> request.getVariationId().equals(item.getId()))
+                        .findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("Variation not found with id: " + request.getVariationId()));
+
+                if (variation.getQuantity() < request.getQuantity()) {
+                    throw new IllegalArgumentException("Insufficient stock for variation: " + product.getName());
+                }
+                variation.setQuantity(variation.getQuantity() - request.getQuantity());
+                unitPrice = variation.getPrice();
+            } else if (product.getQuantity() < request.getQuantity()) {
+                    throw new IllegalArgumentException("Insufficient stock for product: " + product.getName());
+            } else {
+                product.setQuantity(product.getQuantity() - request.getQuantity());
             }
 
-            // Reduce stock quantity
-            product.setQuantity(product.getQuantity() - request.getQuantity());
             productDao.updateProduct(product);
 
             // Create SaleItem and add to the list
             SaleItem saleItem = new SaleItem();
             saleItem.setSale(sale);
             saleItem.setProduct(product);
+            saleItem.setVariation(variation);
             saleItem.setQuantity(request.getQuantity());
-            saleItem.setPrice(product.getPrice()); // Assuming you charge the current price of the product
+            saleItem.setPrice(unitPrice);
 
             saleItems.add(saleItem);
-            totalPrice += product.getPrice() * request.getQuantity();
+            totalPrice += unitPrice * request.getQuantity();
         }
 
         // Set sale details and save
@@ -350,14 +415,15 @@ public class ProductService {
         return sale;
     }
 
-    public Page<Sale> getSalesByCustomerEmail(String email) {
-        return saleDao.findByUserEmail(email);
+    public Page<SaleResponse> getSalesByCustomerEmail(String email, Long storeId) {
+        return saleDao.findByUserEmail(email, storeId)
+                .map((item) -> SaleResponse.fromEntity(item, new ProductDTOMapper(), new CustomerDTOMapper()));
     }
 
-    public Sale getSaleById(Long saleId) {
+    public Sale getSaleById(Long saleId, Long storeId) {
 
-        return saleDao.findById(saleId).orElseThrow(() -> new ResourceNotFoundException(
-                "product with id [%s] not found"
+        return saleDao.findByIdAndStoreId(saleId, storeId).orElseThrow(() -> new ResourceNotFoundException(
+                "pedido com id [%s] não encontrado nesta loja".formatted(saleId)
         ));
     }
 
@@ -367,13 +433,28 @@ public class ProductService {
                 .map((item)-> SaleResponse.fromEntity(item, new ProductDTOMapper(), new CustomerDTOMapper()));
     }
 
-    public Sale updateSaleStatus(Long saleId, String status) {
-        Sale sale = saleDao.findById(saleId).orElse(null);
-        if (sale != null) {
-            sale.setStatus(status);
-            return saleDao.insertSale(sale);
+    public Sale updateSaleStatus(Long saleId, String status, Long storeId) {
+        Set<String> allowedStatuses = Set.of(
+                "PENDENTE",
+                "APROVADO",
+                "PREPARANDO",
+                "ENTREGUE",
+                "CANCELADO",
+                "RECUSADO"
+        );
+        String normalizedStatus = StringUtils.upperCase(StringUtils.trimToEmpty(status));
+
+        if (!allowedStatuses.contains(normalizedStatus)) {
+            throw new RequestValidationException("Status de pedido invalido.");
         }
-        return null;
+
+        Sale sale = saleDao.findByIdAndStoreId(saleId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "pedido com id [%s] não encontrado nesta loja".formatted(saleId)
+                ));
+
+        sale.setStatus(normalizedStatus);
+        return saleDao.insertSale(sale);
     }
 
 }

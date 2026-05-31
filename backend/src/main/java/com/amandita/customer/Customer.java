@@ -15,10 +15,6 @@ import java.util.stream.Collectors;
         name = "customer",
         uniqueConstraints = {
                 @UniqueConstraint(
-                        name = "customer_email_unique",
-                        columnNames = "email"
-                ),
-                @UniqueConstraint(
                         name = "profile_image_id_unique",
                         columnNames = "profileImageId"
                 )
@@ -88,6 +84,10 @@ public class Customer implements UserDetails {
     @ManyToOne
     @JoinColumn(name = "store_id")
     private Store store;
+
+    @ManyToOne
+    @JoinColumn(name = "owned_store_id")
+    private Store ownedStore;
 
 
     public Customer() {
@@ -236,9 +236,15 @@ public class Customer implements UserDetails {
     )
     private Set<Role> roles = new HashSet<>();
 
+    @Transient
+    private Set<Role> effectiveRoles = new HashSet<>();
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return roles.stream()
+        Set<Role> sourceRoles = effectiveRoles != null && !effectiveRoles.isEmpty()
+                ? effectiveRoles
+                : roles;
+        return sourceRoles.stream()
                 .map(role -> new SimpleGrantedAuthority(role.getName()))
                 .collect(Collectors.toList());
     }
@@ -246,6 +252,10 @@ public class Customer implements UserDetails {
     @Override
     public String getPassword() {
         return this.password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 
     @Override
@@ -289,12 +299,24 @@ public class Customer implements UserDetails {
         this.roles = roles;
     }
 
+    public void setEffectiveRoles(Collection<Role> roles) {
+        this.effectiveRoles = roles == null ? new HashSet<>() : new HashSet<>(roles);
+    }
+
     public Store getStore() {
         return store;
     }
 
     public void setStore(Store store) {
         this.store = store;
+    }
+
+    public Store getOwnedStore() {
+        return ownedStore;
+    }
+
+    public void setOwnedStore(Store ownedStore) {
+        this.ownedStore = ownedStore;
     }
 
     @Override

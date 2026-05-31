@@ -1,62 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://amandita.vercel.app/index.tsx</loc>
+    <loc>https://amandita.vercel.app</loc>
   </url>
 
   <url>
-    <loc>https://amandita.vercel.app/_app.tsx</loc>
+    <loc>https://amandita.vercel.app/login</loc>
   </url>
 
   <url>
-    <loc>https://amandita.vercel.app/_document.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/account/index.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/cart/index.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/checkout/index.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/details/[id].tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/favorites/index.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/login/index.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/products/[category].tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/protectedRoute/index.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/sales/index.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/search/[name].tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/signup/index.tsx</loc>
-  </url>
-
-  <url>
-    <loc>https://amandita.vercel.app/success/index.tsx</loc>
+    <loc>https://amandita.vercel.app/signup</loc>
   </url>
 </urlset>

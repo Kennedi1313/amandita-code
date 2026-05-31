@@ -1,5 +1,5 @@
 services:
-  db:
+  amandita-db:
     container_name: amandita-db
     image: amandita-db:latest   
     build:                      
@@ -7,11 +7,12 @@ services:
     environment:
       POSTGRES_USER: amandita
       POSTGRES_PASSWORD: password
+      POSTGRES_DB: amandita
       PGDATA: /data/postgres
     volumes:
-      - db:/data/postgres
+      - amandita-db:/data/postgres
     ports:
-      - "5432:5432"
+      - "5433:5432"
     networks:
       - amandita-network
     restart: unless-stopped
@@ -23,16 +24,24 @@ services:
       context: backend
       dockerfile: Dockerfile
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/amandita
+      SPRING_DATASOURCE_URL: jdbc:postgresql://amandita-db:5432/amandita
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SAAS_BASE_DOMAIN: ${SAAS_BASE_DOMAIN:-mostradigital.com.br}
+      SAAS_ADMIN_URL: ${SAAS_ADMIN_URL:-http://localhost:4173}
+      APP_PUBLIC_API_URL: ${APP_PUBLIC_API_URL:-http://localhost:8080}
+      AWS_S3_MOCK: ${AWS_S3_MOCK:-true}
     env_file:
-      - .env
+      - path: .env
+        required: false
     ports:
       - "8080:8080"
     networks:
       - amandita-network
     depends_on:
-      - db
+      - amandita-db
     restart: unless-stopped
+    volumes:
+      - ~/.amigoscode/s3:/root/.amigoscode/s3
 
   amandita-admin:
     container_name: amandita-admin
@@ -41,7 +50,10 @@ services:
       context: admin
       dockerfile: Dockerfile
       args:
-        api_base_url: http://amandita-api:8080
+        api_build_url: http://amandita-api:8080
+        api_runtime_url: ${APP_PUBLIC_API_URL:-http://localhost:8080}
+        google_client_id: ${GOOGLE_CLIENT_ID}
+        portal_url: ${PORTAL_PUBLIC_URL:-http://localhost:5174}
     ports:
       - "4173:4173"
     networks:
@@ -57,7 +69,9 @@ services:
       context: frontend
       dockerfile: Dockerfile
       args:
-        api_base_url: http://amandita-api:8080
+        api_build_url: http://amandita-api:8080/api/v1
+        api_runtime_url: ${APP_PUBLIC_API_V1_URL:-http://localhost:8080/api/v1}
+        google_client_id: ${GOOGLE_CLIENT_ID}
     ports:
       - "3000:3000"
     networks:
@@ -65,13 +79,24 @@ services:
     depends_on:
       - amandita-api
     restart: unless-stopped
-    
-  cloudflared:
-    image: cloudflare/cloudflared:latest
-    container_name: cloudflared
-    volumes:
-      - ~/.cloudflared:/root/.cloudflared:ro
-    command: tunnel run
+
+  amandita-portal:
+    container_name: amandita-portal
+    image: amandita-portal:latest
+    build:
+      context: portal
+      dockerfile: Dockerfile
+      args:
+        api_url: ${APP_PUBLIC_API_V1_URL:-http://localhost:8080/api/v1}
+        base_domain: ${SAAS_BASE_DOMAIN:-mostradigital.com.br}
+        admin_url: ${SAAS_ADMIN_URL:-http://localhost:4173}
+        google_client_id: ${GOOGLE_CLIENT_ID}
+    ports:
+      - "5174:5174"
+    networks:
+      - amandita-network
+    depends_on:
+      - amandita-api
     restart: unless-stopped
 
 networks:
@@ -79,4 +104,4 @@ networks:
     driver: bridge
 
 volumes:
-  db:
+  amandita-db:

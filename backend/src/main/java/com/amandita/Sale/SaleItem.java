@@ -1,6 +1,7 @@
 package com.amandita.Sale;
 
 import com.amandita.product.Product;
+import com.amandita.product.ProductVariation;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;
 
@@ -20,6 +21,10 @@ public class SaleItem {
     @ManyToOne
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
+
+    @ManyToOne
+    @JoinColumn(name = "variation_id")
+    private ProductVariation variation;
 
     @Column(name = "quantity", nullable = false)
     private Integer quantity;
@@ -53,6 +58,14 @@ public class SaleItem {
 
     public void setProduct(Product product) {
         this.product = product;
+    }
+
+    public ProductVariation getVariation() {
+        return variation;
+    }
+
+    public void setVariation(ProductVariation variation) {
+        this.variation = variation;
     }
 
     public Integer getQuantity() {

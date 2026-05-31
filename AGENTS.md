@@ -16,6 +16,7 @@ Amandita is a small monorepo with three main services:
 - `backend/` — Spring Boot API service using Java 21
 - `frontend/` — Next.js customer storefront
 - `admin/` — Vite + React admin dashboard
+- `portal/` — Vite + React SaaS portal and store signup flow
 - `db/` — PostgreSQL container support
 - `docker-compose.yml` — local orchestration of the full stack
 
@@ -34,6 +35,7 @@ This repository is designed for local Docker Compose development and service-lev
 - `backend/` is the backend API and business logic.
 - `frontend/` is the public storefront.
 - `admin/` is the internal admin UI.
+- `portal/` is the public SaaS portal and onboarding entry point.
 - `db/` is the database container configuration.
 
 ## Key files
@@ -43,6 +45,7 @@ This repository is designed for local Docker Compose development and service-lev
 - `backend/Dockerfile` — backend image build and runtime
 - `frontend/package.json` — storefront dependencies and scripts
 - `admin/package.json` — admin dependencies and scripts
+- `portal/package.json` — portal dependencies and scripts
 - `frontend/pages` — storefront page routes
 - `admin/src` — admin frontend source code
 - `backend/src/main/java` — backend source code
@@ -52,6 +55,13 @@ This repository is designed for local Docker Compose development and service-lev
 - Backend API: `http://localhost:8080`
 - Frontend dev: `http://localhost:3000`
 - Admin dev: `http://localhost:4173`
+- Portal dev: `http://localhost:5174`
+
+Domain topology:
+- Admin is a single shared app, not per-store subdomains.
+- API is a single shared backend, not per-store subdomains.
+- Storefront domains identify stores. The storefront sends `X-Store-Domain` to the API.
+- Authenticated admin requests should resolve store context from the JWT `storeId`, not from host/subdomain.
 
 Validation commands:
 
@@ -59,6 +69,7 @@ Validation commands:
 cd backend && mvn clean test-compile
 cd admin && npm install && npm run build
 cd frontend && npm install && npm run build
+cd portal && npm install && npm run build
 docker compose up --build
 ```
 

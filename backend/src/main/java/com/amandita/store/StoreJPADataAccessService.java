@@ -18,6 +18,11 @@ public class StoreJPADataAccessService implements StoreDao {
     }
 
     @Override
+    public boolean existsByDomain(String domain) {
+        return this.storeRepository.existsByDomain(domain);
+    }
+
+    @Override
     public Store insertStore(Store store) {
         return this.storeRepository.save(store);
     }

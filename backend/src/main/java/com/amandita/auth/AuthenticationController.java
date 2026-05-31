@@ -26,4 +26,28 @@ public class AuthenticationController {
                 .body(response);
     }
 
+    @PostMapping("admin/login")
+    public ResponseEntity<?> adminLogin(@RequestBody AuthenticationRequest request) {
+        AuthenticationResponse response = authenticationService.adminLogin(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.AUTHORIZATION, response.token())
+                .body(response);
+    }
+
+    @PostMapping("admin/google")
+    public ResponseEntity<?> adminLoginWithGoogle(@RequestBody GoogleLoginRequest request) {
+        AuthenticationResponse response = authenticationService.adminLoginWithGoogle(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.AUTHORIZATION, response.token())
+                .body(response);
+    }
+
+    @PostMapping("google")
+    public ResponseEntity<?> loginWithGoogle(@RequestBody GoogleLoginRequest request, HttpServletRequest httpRequest) {
+        AuthenticationResponse response = authenticationService.loginWithGoogle(request, (Long) httpRequest.getAttribute("storeId"));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.AUTHORIZATION, response.token())
+                .body(response);
+    }
+
 }

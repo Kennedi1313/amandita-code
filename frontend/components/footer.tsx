@@ -4,6 +4,9 @@ import useStoreInfo from "@/hooks/use-store-info";
 
 export default function Footer() {
   const storeInfo = useStoreInfo();
+  const instagram = storeInfo?.instagram?.replace(/^@/, "");
+  const whatsapp = storeInfo?.whatsapp?.replace(/\D/g, "");
+
   return (
     <div className="flex flex-col items-center mt-14  bg-white">
       <div className="md:p-16 flex flex-col md:flex-row gap-5 w-full justify-around p-3 pt-10">
@@ -24,18 +27,34 @@ export default function Footer() {
         <div className="flex flex-col w-full justify-center items-center md:items-center text-sm">
           <span className="font-semibold">Contato</span>
           <div>
-            <div className="flex flex-row gap-2 items-center">
+            {instagram && (
+              <a
+                className="flex flex-row gap-2 items-center"
+                href={`https://www.instagram.com/${instagram}`}
+                target="_blank"
+                rel="noreferrer"
+              >
               <BsInstagram></BsInstagram>
-              {storeInfo?.instagram}
-            </div>
-            <div className="flex flex-row gap-2 items-center">
-              <BsTelephone></BsTelephone>
-              {storeInfo?.whatsapp}
-            </div>
-            <div className="flex flex-row gap-2 items-center">
+                @{instagram}
+              </a>
+            )}
+            {whatsapp && (
+              <a
+                className="flex flex-row gap-2 items-center"
+                href={`https://api.whatsapp.com/send?phone=55${whatsapp}`}
+                target="_blank"
+                rel="noreferrer"
+              >
               <BsWhatsapp></BsWhatsapp>
-              {storeInfo?.whatsapp}
-            </div>
+                {storeInfo?.whatsapp}
+              </a>
+            )}
+            {!instagram && !whatsapp && (
+              <div className="flex flex-row gap-2 items-center">
+                <BsTelephone></BsTelephone>
+                Contato não informado
+              </div>
+            )}
           </div>
         </div>
       </div>

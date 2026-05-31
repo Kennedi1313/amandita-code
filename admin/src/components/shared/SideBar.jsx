@@ -1,7 +1,7 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Avatar,
   Box,
+  Button,
   CloseButton,
   Drawer,
   DrawerContent,
@@ -9,36 +9,28 @@ import {
   HStack,
   Icon,
   IconButton,
+  Image,
   Link,
   Menu,
-  Text,
-  useColorModeValue,
-  useDisclosure,
-  VStack,
-  Image,
-  Divider,
   Stack,
+  Text,
   useBreakpointValue,
-  DrawerOverlay,
+  useDisclosure,
 } from "@chakra-ui/react";
 
 import {
-  FiDollarSign,
+  FiExternalLink,
   FiHome,
   FiLogOut,
   FiMenu,
   FiPackage,
-  FiPhone,
   FiSettings,
-  FiShoppingBag,
-  FiShoppingCart,
-  FiTruck,
+  FiTag,
   FiUsers,
 } from "react-icons/fi";
 
-import { BsCalculatorFill } from "react-icons/bs";
 import { useAuth } from "../context/AuthContext.jsx";
-import { useShoppingFavorites } from "../../hooks/use-shopping-favorites.jsx";
+import { getStorefrontUrl, getStoreInfo } from "../../services/client.js";
 
 export default function SidebarWithHeader({ children }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -90,33 +82,30 @@ export default function SidebarWithHeader({ children }) {
 
 const SidebarContent = ({ onClose, ...rest }) => {
   const { logOut, customer } = useAuth();
-  const { favoritesCount } = useShoppingFavorites();
+  const [storeUrl, setStoreUrl] = useState("");
+
+  useEffect(() => {
+    getStoreInfo()
+      .then((response) => {
+        setStoreUrl(getStorefrontUrl(response.data?.domain));
+      })
+      .catch(() => {
+        setStoreUrl("");
+      });
+  }, []);
+
   const administrar = [
     { name: "Clientes", route: "/dashboard/customers", icon: FiUsers },
     { name: "Produtos", route: "/dashboard/products", icon: FiPackage },
   ];
 
-  const venda = [
-    { name: "Loja Online", route: "/dashboard/shop", icon: FiShoppingBag },
-    {
-      name: `Ponto de Venda (${favoritesCount})`,
-      route: "/dashboard/sell",
-      icon: FiShoppingCart,
-    },
-  ];
-
   const configuracao = [
     {
-      name: "Informações de contato",
-      route: "/dashboard/contact",
-      icon: FiPhone,
+      name: "Loja",
+      route: "/dashboard/store",
+      icon: FiSettings,
     },
-    {
-      name: "Opções de checkout",
-      route: "/dashboard/checkout",
-      icon: FiDollarSign,
-    },
-    { name: "Formas de entrega", route: "/dashboard/ship", icon: FiTruck },
+    { name: "Categorias", route: "/dashboard/categories", icon: FiTag },
   ];
   return (
     <Stack
@@ -159,7 +148,7 @@ const SidebarContent = ({ onClose, ...rest }) => {
         <Text alignSelf={"center"}>Mostra Digital</Text>
       </Flex>
 
-      <Stack pl={4} gap={2} pt={8}>
+      <Stack pl={4} pr={4} gap={2} pt={8}>
         <NavItem route={"/dashboard"} icon={FiHome}>
           {"Inicio"}
         </NavItem>
@@ -167,14 +156,6 @@ const SidebarContent = ({ onClose, ...rest }) => {
           Administrar
         </Text>
         {administrar.map((link) => (
-          <NavItem key={link.name} route={link.route} icon={link.icon}>
-            {link.name}
-          </NavItem>
-        ))}
-        <Text fontSize={"sm"} fontWeight={"bold"}>
-          Canais de venda
-        </Text>
-        {venda.map((link) => (
           <NavItem key={link.name} route={link.route} icon={link.icon}>
             {link.name}
           </NavItem>
@@ -191,6 +172,23 @@ const SidebarContent = ({ onClose, ...rest }) => {
           Perfil
         </Text>
         <Text fontSize="sm">{customer?.username}</Text>
+        {storeUrl && (
+          <Button
+            as="a"
+            href={storeUrl}
+            target="_blank"
+            rel="noreferrer"
+            leftIcon={<FiExternalLink />}
+            size="sm"
+            variant="outline"
+            borderColor="whiteAlpha.500"
+            color="white"
+            _hover={{ bg: "whiteAlpha.200" }}
+            justifyContent="flex-start"
+          >
+            Ver loja
+          </Button>
+        )}
         <NavItem onClick={logOut} icon={FiLogOut}>
           Deslogar
         </NavItem>
@@ -201,31 +199,39 @@ const SidebarContent = ({ onClose, ...rest }) => {
 };
 
 const NavItem = ({ icon, route, children, ...rest }) => {
+  const content = (
+    <Flex
+      align="center"
+      borderRadius="lg"
+      role="group"
+      cursor="pointer"
+      {...rest}
+    >
+      {icon && (
+        <Icon
+          mr="3"
+          fontSize="16"
+          _groupHover={{
+            color: "white",
+          }}
+          as={icon}
+        />
+      )}
+      {children}
+    </Flex>
+  );
+
+  if (!route) {
+    return content;
+  }
+
   return (
     <Link
       href={route}
       style={{ textDecoration: "none" }}
       _focus={{ boxShadow: "none" }}
     >
-      <Flex
-        align="center"
-        borderRadius="lg"
-        role="group"
-        cursor="pointer"
-        {...rest}
-      >
-        {icon && (
-          <Icon
-            mr="3"
-            fontSize="16"
-            _groupHover={{
-              color: "white",
-            }}
-            as={icon}
-          />
-        )}
-        {children}
-      </Flex>
+      {content}
     </Link>
   );
 };

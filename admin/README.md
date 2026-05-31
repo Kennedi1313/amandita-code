@@ -39,4 +39,5 @@ docker compose up --build admin
 ## Notes
 
 - The admin service expects the backend API at `http://amandita-api:8080` when running under Docker Compose.
+- The admin service is built to use the host-accessible backend URL `http://localhost:8080` when running under Docker Compose.
 - Use the root `docker-compose.yml` for a complete local stack with database and backend.

@@ -32,7 +32,7 @@ public class ProductJPADataAccessService implements ProductDao {
 
     public Page<Product> findProductsByCategoryByStore(String category, int page, int size, Long storeId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return productRepository.findByCategoryByStore(category, pageable, storeId);
+        return productRepository.findByStoreIdAndCategory(storeId, category, pageable);
     }
 
     public Page<Product> findProductsByCategory(String category, int page, int size) {
@@ -42,7 +42,7 @@ public class ProductJPADataAccessService implements ProductDao {
 
     public Page<Product> findProductsByNameByStore(String query, int page, int size, Long storeId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return productRepository.findByNameContainingIgnoreCaseByStore(query, pageable, storeId);
+        return productRepository.findByStoreIdAndNameContainingIgnoreCase(storeId, query, pageable);
     }
 
     public Page<Product> findProductsByName(String query, int page, int size) {
@@ -57,6 +57,11 @@ public class ProductJPADataAccessService implements ProductDao {
     }
 
     @Override
+    public Optional<Product> selectProductByIdAndStore(Integer productId, Long storeId) {
+        return productRepository.findByIdAndStoreId(productId, storeId);
+    }
+
+    @Override
     @SuppressWarnings("unchecked")
     public Product insertProduct(Product product) {
         return productRepository.save(product);
@@ -65,6 +70,21 @@ public class ProductJPADataAccessService implements ProductDao {
     @Override
     public boolean existsProductById(Integer productId) {
         return productRepository.existsProductsById(productId);
+    }
+
+    @Override
+    public boolean existsSaleItemByProductId(Integer productId) {
+        return productRepository.existsSaleItemByProductId(productId);
+    }
+
+    @Override
+    public boolean existsSaleItemByVariationId(Integer variationId) {
+        return productRepository.existsSaleItemByVariationId(variationId);
+    }
+
+    @Override
+    public boolean existsHistoryByProductId(Integer productId) {
+        return productRepository.existsHistoryByProductId(productId);
     }
 
     @Override

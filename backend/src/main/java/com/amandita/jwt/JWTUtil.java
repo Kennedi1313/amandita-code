@@ -4,10 +4,12 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.security.Key;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -18,9 +20,14 @@ import static java.time.temporal.ChronoUnit.DAYS;
 @Service
 public class JWTUtil {
 
-    private static final String SECRET_KEY =
-            "foobar_123456789_foobar_123456789_foobar_123456789_foobar_123456789";
+    private final String secretKey;
 
+    public JWTUtil(@Value("${jwt.secret}") String secretKey) {
+        if (secretKey == null || secretKey.length() < 32) {
+            throw new IllegalStateException("JWT_SECRET must contain at least 32 characters.");
+        }
+        this.secretKey = secretKey;
+    }
 
     public String issueToken(String subject) {
         return issueToken(subject, Map.of());
@@ -73,7 +80,7 @@ public class JWTUtil {
     }
 
     private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
+        return Keys.hmacShaKeyFor(secretKey.getBytes());
     }
 
     public boolean isTokenValid(String jwt, String username) {
@@ -93,5 +100,16 @@ public class JWTUtil {
                 .parseClaimsJws(token)
                 .getBody();
         return claims.get("storeId", Long.class);
+    }
+
+    public boolean hasScope(String token, String scope) {
+        Object scopes = getClaims(token).get("scopes");
+        if (scopes instanceof List<?> list) {
+            return list.stream().anyMatch(item -> scope.equals(String.valueOf(item)));
+        }
+        if (scopes instanceof String[] array) {
+            return Arrays.asList(array).contains(scope);
+        }
+        return false;
     }
 }

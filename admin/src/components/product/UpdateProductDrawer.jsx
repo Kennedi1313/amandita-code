@@ -4,7 +4,6 @@ import {
   DrawerBody,
   DrawerCloseButton,
   DrawerContent,
-  DrawerFooter,
   DrawerHeader,
   DrawerOverlay,
   useDisclosure,
@@ -12,9 +11,12 @@ import {
 import UpdateProductForm from "./UpdateProductForm.jsx";
 import { FiEdit } from "react-icons/fi";
 
-const CloseIcon = () => "x";
-
-const UpdateProductDrawer = ({ fetchProducts, initialValues, productId }) => {
+const UpdateProductDrawer = ({
+  fetchProducts,
+  initialValues,
+  productId,
+  buttonProps = {},
+}) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   return (
     <>
@@ -28,6 +30,7 @@ const UpdateProductDrawer = ({ fetchProducts, initialValues, productId }) => {
           boxShadow: "lg",
         }}
         onClick={onOpen}
+        {...buttonProps}
       >
         Editar
       </Button>

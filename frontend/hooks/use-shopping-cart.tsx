@@ -29,7 +29,14 @@ const addItemToCart = (
 ) => {
   if (quantity <= 0 || !product) return state;
 
-  let entry = state?.cartDetails?.[product.id];
+  const cartKey = String(product.id);
+  let entry = state?.cartDetails?.[cartKey];
+  const stockQuantity = Number(entry?.stockQuantity ?? product.stockQuantity ?? product.quantity ?? 0);
+  const nextQuantity = entry ? entry.quantity + quantity : quantity;
+
+  if (stockQuantity > 0 && nextQuantity > stockQuantity) {
+    return state;
+  }
 
   // Update item
   if (entry) {
@@ -37,9 +44,9 @@ const addItemToCart = (
       ...state,
       cartDetails: {
         ...state.cartDetails,
-        [product.id]: {
+        [cartKey]: {
           ...entry,
-          quantity: entry.quantity + quantity,
+          quantity: nextQuantity,
         },
       },
       cartCount: Math.max(0, state.cartCount + quantity),
@@ -50,8 +57,9 @@ const addItemToCart = (
     ...state,
     cartDetails: {
       ...state.cartDetails,
-      [product.id]: {
+        [cartKey]: {
         ...product,
+        stockQuantity: product.stockQuantity ?? product.quantity,
         quantity,
       },
     },
@@ -66,12 +74,13 @@ const removeItem = (
 ) => {
   if (quantity <= 0 || !product) return state;
 
-  let entry = state?.cartDetails?.[product.id];
+  const cartKey = String(product.id);
+  let entry = state?.cartDetails?.[cartKey];
 
   if (entry) {
     // Remove item
     if (quantity >= entry.quantity) {
-      const { [product.id]: id, ...details } = state.cartDetails;
+      const { [cartKey]: id, ...details } = state.cartDetails;
       return {
         ...state,
         cartDetails: details,
@@ -85,7 +94,7 @@ const removeItem = (
         ...state,
         cartDetails: {
           ...state.cartDetails,
-          [product.id]: {
+          [cartKey]: {
             ...entry,
             quantity: entry.quantity - quantity,
           },

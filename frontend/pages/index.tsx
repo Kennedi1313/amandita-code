@@ -26,14 +26,21 @@ export default function Home({ products, itemsCount }: HomeProps) {
   }, []);
   const storeInfo = useStoreInfo();
   if (!storeInfo || !hasMounted) return null;
+  const hasUploadedBanner = storeInfo.bannerUrl.match(/^https?:\/\//i);
+  const desktopBannerSrc = hasUploadedBanner
+    ? storeInfo.bannerUrl
+    : "/" + storeInfo.bannerUrl + ".png";
+  const mobileBannerSrc = hasUploadedBanner
+    ? storeInfo.bannerUrl
+    : "/" + storeInfo.bannerUrl + "_mobile.png";
   return (
     <>
       {productListSize > 0 ? (
         <div>
-          <div className="relative mt-[8.5rem] gray-50">
+          <div className="relative mt-20 md:mt-[8.5rem] gray-50">
             <div className="block md:hidden">
               <Image
-                src={"/" + storeInfo.bannerUrl + "_mobile.png"}
+                src={mobileBannerSrc}
                 alt="Banner Mobile"
                 width={768}
                 height={400}
@@ -42,7 +49,7 @@ export default function Home({ products, itemsCount }: HomeProps) {
             </div>
             <div className="hidden md:block max-w-screen-lg w-full m-auto">
               <Image
-                src={"/" + storeInfo.bannerUrl + ".png"}
+                src={desktopBannerSrc}
                 alt="Banner Desktop"
                 width={768}
                 height={400}
@@ -66,6 +73,7 @@ export default function Home({ products, itemsCount }: HomeProps) {
                   description={item.description}
                   promo={item.promo}
                   profileImageId={item.profileImageId}
+                  variations={item.variations}
                 />
               ))}
             </div>

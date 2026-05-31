@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { getCustomers, login as performLogin } from "../../lib/client";
+import { login as performLogin, loginWithGoogle as performGoogleLogin } from "../../lib/client";
 import * as jwtDecode from "jwt-decode";
 interface UserProps {
   username?: string;
@@ -8,24 +8,36 @@ interface UserProps {
 
 const AuthContext = createContext({} as any);
 
-const AuthProvider = ({ children }: any) => {
-  if (typeof window == "undefined") {
-    // Perform localStorage action
-    return null;
-  }
+const normalizeAccessToken = (token?: string | null) => {
+  if (!token) return "";
+  return token.replace(/^Bearer\s+/i, "").trim();
+};
 
+const AuthProvider = ({ children }: any) => {
   const [customer, setCustomer] = useState(null as any);
   const [isClient, setIsClient] = useState(false);
+
   const setCustomerFromToken = () => {
-    let token = localStorage.getItem("access_token");
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const token = normalizeAccessToken(localStorage.getItem("access_token"));
     if (token) {
-      let tokenDecoded = jwtDecode.default<any>(token);
-      setCustomer({
-        username: tokenDecoded?.sub,
-        roles: tokenDecoded?.scopes,
-      });
+      try {
+        localStorage.setItem("access_token", token);
+        const tokenDecoded = jwtDecode.default<any>(token);
+        setCustomer({
+          username: tokenDecoded?.sub,
+          roles: tokenDecoded?.scopes,
+        });
+      } catch {
+        localStorage.removeItem("access_token");
+        setCustomer(null);
+      }
     }
   };
+
   useEffect(() => {
     setIsClient(true);
     setCustomerFromToken();
@@ -35,7 +47,32 @@ const AuthProvider = ({ children }: any) => {
     return new Promise((resolve, reject) => {
       performLogin(usernameAndPassword)
         .then((res) => {
-          const jwtToken = res.headers["authorization"];
+          const jwtToken = normalizeAccessToken(
+            res.headers["authorization"] || res.data?.token,
+          );
+          localStorage.setItem("access_token", jwtToken);
+
+          const decodedToken = jwtDecode.default<any>(jwtToken);
+
+          setCustomer({
+            username: decodedToken.sub,
+            roles: decodedToken.scopes,
+          });
+          resolve(res);
+        })
+        .catch((err: any) => {
+          reject(err);
+        });
+    });
+  };
+
+  const loginWithGoogle = async (credential: string) => {
+    return new Promise((resolve, reject) => {
+      performGoogleLogin(credential)
+        .then((res) => {
+          const jwtToken = normalizeAccessToken(
+            res.headers["authorization"] || res.data?.token,
+          );
           localStorage.setItem("access_token", jwtToken);
 
           const decodedToken = jwtDecode.default<any>(jwtToken);
@@ -58,12 +95,18 @@ const AuthProvider = ({ children }: any) => {
   };
 
   const isCustomerAuthenticated = () => {
-    const token = localStorage.getItem("access_token");
+    const token = normalizeAccessToken(localStorage.getItem("access_token"));
     if (!token) {
       return false;
     }
-    const { exp: expiration } = jwtDecode.default<any>(token);
-    if (Date.now() > expiration * 1000) {
+    try {
+      localStorage.setItem("access_token", token);
+      const { exp: expiration } = jwtDecode.default<any>(token);
+      if (Date.now() > expiration * 1000) {
+        logOut();
+        return false;
+      }
+    } catch {
       logOut();
       return false;
     }
@@ -77,6 +120,7 @@ const AuthProvider = ({ children }: any) => {
           value={{
             customer,
             login,
+            loginWithGoogle,
             logOut,
             isCustomerAuthenticated,
             setCustomerFromToken,

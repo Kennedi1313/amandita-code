@@ -1,7 +1,8 @@
 # Amandita
 
-This repository contains a small Docker Compose application with two frontend services and one backend service:
+This repository contains a small Docker Compose application with three frontend services and one backend service:
 
+- `portal/` — Vite + React SaaS landing and store signup flow
 - `admin/` — Vite + React admin dashboard
 - `frontend/` — Next.js storefront
 - `backend/` — Spring Boot API service
@@ -18,6 +19,7 @@ This monorepo structure is a good fit for a small project using Docker Compose, 
 
 ## Project structure
 
+- `portal/` — public SaaS portal powered by Vite and React
 - `admin/` — admin web UI powered by Vite and React
 - `frontend/` — public storefront built with Next.js
 - `backend/` — Java Spring Boot API
@@ -36,7 +38,32 @@ Open the services in your browser:
 
 - Admin: `http://localhost:4173`
 - Storefront: `http://localhost:3000`
+- Portal: `http://localhost:5174`
 - API: `http://localhost:8080`
+
+### Domain model
+
+Local Docker uses one shared admin and one shared API:
+
+- Admin is always served from the admin app, for example `http://localhost:4173`.
+- API is always served from the backend app, for example `http://localhost:8080`.
+- Storefront domains identify the store, for example `kendindin.mostradigital.com.br`.
+
+In local development, the storefront sends the current browser hostname to the backend using `X-Store-Domain`. Authenticated admin requests use the `storeId` from the JWT instead of a domain header.
+
+To test a storefront domain locally, point only the storefront domain to localhost:
+
+```txt
+127.0.0.1 kendindin.mostradigital.com.br
+```
+
+Then open:
+
+```txt
+http://kendindin.mostradigital.com.br:3000
+```
+
+Do not create per-store admin or API hosts like `admin.kendindin...` or `api.kendindin...`; those are not part of the current topology.
 
 ### Stop services
 

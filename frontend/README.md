@@ -49,4 +49,5 @@ The service is available at `http://localhost:3000`.
 ## Notes
 
 - When running with Docker Compose, the frontend is configured to talk to the backend at `http://amandita-api:8080`.
+ - When running with Docker Compose, the frontend is configured to talk to the backend using host-accessible URL `http://localhost:8080`.
 - Use the root `docker-compose.yml` to run the full application with the database, backend, admin UI, and storefront.

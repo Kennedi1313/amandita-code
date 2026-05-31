@@ -31,7 +31,7 @@ export default function Search() {
 
   const renderProductList = () => (
     <div>
-      <div className="mt-[8.5rem] md:mt-36 md:max-w-screen-lg mx-auto flex flex-col gap-6 items-center justify-center px-1 md:px-0 py-5 my-2">
+      <div className="mt-20 md:mt-36 md:max-w-screen-lg mx-auto flex flex-col gap-6 items-center justify-center px-1 md:px-0 py-5 my-2">
         <h1>Resultados encontrados para a sua busca: {query}.</h1>
         <div className="center grid lg:grid-cols-4 grid-cols-2 w-full gap-1 gap-y-6">
           {productList.map((item) => (
@@ -44,6 +44,7 @@ export default function Search() {
               quantity={item.quantity}
               promo={item.promo}
               profileImageId={item.profileImageId}
+              variations={item.variations}
             />
           ))}
         </div>

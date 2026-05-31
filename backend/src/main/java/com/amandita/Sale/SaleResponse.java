@@ -51,7 +51,8 @@ public record SaleResponse(
             Long id,
             ProductDTO product,
             Integer quantity,
-            Integer price
+            Integer price,
+            String variation
     ) {
 
         private static SaleItemDTO fromEntity(SaleItem item, ProductDTOMapper mapper) {
@@ -63,7 +64,10 @@ public record SaleResponse(
                     item.getId(),
                     mapper.apply(item.getProduct()),
                     item.getQuantity(),
-                    item.getPrice()
+                    item.getPrice(),
+                    item.getVariation() != null && item.getVariation().getOptions() != null
+                            ? item.getVariation().getOptions().values().stream().findFirst().orElse(null)
+                            : null
             );
         }
     }

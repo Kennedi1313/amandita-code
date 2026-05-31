@@ -3,6 +3,7 @@ package com.amandita.product;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
 
 @Service
@@ -21,13 +22,21 @@ public class ProductDTOMapper implements Function<Product, ProductDTO> {
                 .toList()
                 : List.of();
 
+        Integer visibleQuantity = variationDTOs.isEmpty()
+                ? product.getQuantity()
+                : product.getVariations().stream()
+                .map(ProductVariation::getQuantity)
+                .filter(Objects::nonNull)
+                .mapToInt(Integer::intValue)
+                .sum();
+
         return new ProductDTO(
                 product.getId(),
                 product.getName(),
                 product.getDescription(),
                 product.getOriginalPrice(),
                 formatPrice(product.getPrice()),
-                product.getQuantity(),
+                visibleQuantity,
                 product.getCategory(),
                 product.getprofileImageId(),
                 product.getPromo(),
@@ -38,6 +47,7 @@ public class ProductDTOMapper implements Function<Product, ProductDTO> {
 
     public ProductVariationDTO toProductVariationDTO(ProductVariation variation) {
         return new ProductVariationDTO(
+                variation.getId(),
                 variation.getOptions(),
                 variation.getSku(),
                 formatPrice(variation.getPrice()),

@@ -10,25 +10,29 @@ import {
   Alert,
   AlertIcon,
   SimpleGrid,
+  Icon,
 } from "@chakra-ui/react";
 import SidebarWithHeader from "./components/shared/SideBar.jsx";
+import PageHeader from "./components/shared/PageHeader.jsx";
 import { useEffect, useState } from "react";
 import {
   getProducts,
   getProductsByCategory,
+  getProductsByName,
 } from "./services/product-client.js";
 import CardWithImage from "./components/product/ProductCard.jsx";
 import { errorNotification } from "./services/notification.js";
 import CreateProductDrawer from "./components/product/CreateProductDrawer.jsx";
 import { Field, Form, Formik } from "formik";
-import axios from "axios";
 import Pagination from "./components/product/Pagination.jsx";
 import { usePagination } from "./components/context/PaginationContext.jsx";
-import { getCategories, getUrl } from "./services/client.js";
+import { getCategories } from "./services/client.js";
+import { FiPackage, FiSearch } from "react-icons/fi";
 
 const Product = () => {
   const [products, setProducts] = useState([]);
   const [category, setCategory] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
   const [productsWithSearch, setProductsWithSearch] = useState(products);
   const [loading, setLoading] = useState(false);
   const [err, setError] = useState("");
@@ -39,7 +43,9 @@ const Product = () => {
   const fetchProducts = () => {
     setLoading(true);
     let response;
-    if (category === "") {
+    if (searchTerm.trim()) {
+      response = getProductsByName(searchTerm.trim(), currentPage);
+    } else if (category === "") {
       response = getProducts(currentPage);
     } else {
       response = getProductsByCategory(category, currentPage);
@@ -51,8 +57,10 @@ const Product = () => {
         setProductListSize(res.data.totalElements);
       })
       .catch((err) => {
-        setError(err.response.data.message);
-        errorNotification(err.code, err.response.data.message);
+        const message =
+          err.response?.data?.message || "Falha ao carregar produtos";
+        setError(message);
+        errorNotification(err.code || "Erro", message);
       })
       .finally(() => {
         setLoading(false);
@@ -71,10 +79,12 @@ const Product = () => {
 
   useEffect(() => {
     fetchProducts();
-  }, [category, currentPage]);
+  }, [category, searchTerm, currentPage]);
 
   const handleCategoryChange = (e) => {
+    setCurrentPage(0);
     setCategory(e.target.value);
+    setSearchTerm("");
     setProducts([]);
     setProductsWithSearch([]);
   };
@@ -95,25 +105,20 @@ const Product = () => {
 
   return (
     <SidebarWithHeader>
-      <Box
-        width={"full"}
-        maxWidth={{ base: "full", lg: "container.lg" }}
-        mx="auto"
-      >
-        {/* Always Visible Category Filter */}
-        <Box paddingTop={"24px"} paddingBottom={"8px"}>
-          <Text fontWeight={"semibold"} fontSize={"4xl"}>
-            Produtos
-          </Text>
-        </Box>
+      <Box maxW="7xl" mx="auto" px={{ base: 2, md: 6 }} py={{ base: 4, md: 8 }}>
+        <PageHeader
+          title="Produtos"
+          description="Cadastre, filtre e mantenha estoque, preço e imagens da vitrine."
+        >
+          <CreateProductDrawer fetchProducts={fetchProducts} />
+        </PageHeader>
 
         <Flex
           flexDirection={{ base: "column", md: "row" }}
           justify={"space-between"}
           gap={"1rem"}
+          mb={4}
         >
-          <CreateProductDrawer fetchProducts={fetchProducts} />
-
           <Box>
             <Select
               id="category"
@@ -134,23 +139,9 @@ const Product = () => {
           <Formik
             initialValues={{ search: "" }}
             onSubmit={async (data) => {
-              try {
-                const response = await axios.get(
-                  `${getUrl()}/api/v1/products/by-name`,
-                  {
-                    params: {
-                      query: data.search,
-                      page: 0,
-                      size: 8,
-                    },
-                  },
-                );
-                setCurrentPage(0);
-                setProductListSize(response.data.totalElements);
-                setProductsWithSearch(response.data.content || []);
-              } catch (error) {
-                console.error("Erro ao buscar produtos:", error);
-              }
+              setCurrentPage(0);
+              setCategory("");
+              setSearchTerm(data.search);
             }}
           >
             <Form>
@@ -181,6 +172,20 @@ const Product = () => {
                 >
                   Pesquisar
                 </Button>
+                {searchTerm && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    color={"#5f5482"}
+                    marginTop={0}
+                    onClick={() => {
+                      setCurrentPage(0);
+                      setSearchTerm("");
+                    }}
+                  >
+                    Limpar
+                  </Button>
+                )}
               </Stack>
             </Form>
           </Formik>
@@ -195,35 +200,76 @@ const Product = () => {
         )}
 
         {/* No Products Display */}
-        {products.length <= 0 && !loading && !err && (
-          <Text mt={5}>Nenhum produto cadastrado para esta categoria.</Text>
+        {productsWithSearch.length <= 0 && !loading && !err && (
+          <Box
+            mt={6}
+            border="1px solid"
+            borderColor="gray.100"
+            borderRadius="md"
+            bg="white"
+            p={{ base: 6, md: 10 }}
+            textAlign="center"
+          >
+            <Icon
+              as={searchTerm || category ? FiSearch : FiPackage}
+              boxSize={10}
+              color="#5f5482"
+            />
+            <Text mt={3} fontWeight="bold" fontSize="xl">
+              {searchTerm || category
+                ? "Nenhum produto encontrado"
+                : "Sua vitrine ainda está vazia"}
+            </Text>
+            <Text mt={1} color="gray.500">
+              {searchTerm || category
+                ? "Tente limpar os filtros ou buscar por outro nome."
+                : "Cadastre seu primeiro produto com nome, fotos, preço e estoque."}
+            </Text>
+            {(searchTerm || category) && (
+              <Button
+                mt={4}
+                variant="outline"
+                colorScheme="purple"
+                onClick={() => {
+                  setCurrentPage(0);
+                  setCategory("");
+                  setSearchTerm("");
+                }}
+              >
+                Limpar filtros
+              </Button>
+            )}
+          </Box>
         )}
 
         {/* Products Display */}
         <Text marginTop={"8px"} textColor={"#5f5482"} fontWeight={"semibold"}>
           {productListSize} produtos
         </Text>
-        <SimpleGrid
-          columns={{ base: 2, md: 3, lg: 4 }}
-          spacing={"6px"}
-          justifyItems="center"
-        >
-          {productsWithSearch.map((product, index) => (
-            <CardWithImage
-              key={index}
-              {...product}
-              imageNumber={index}
-              fetchProducts={fetchProducts}
+        {productsWithSearch.length > 0 && (
+          <>
+            <SimpleGrid
+              columns={{ base: 1, sm: 2, lg: 3, xl: 4 }}
+              spacing={4}
+              alignItems="stretch"
+            >
+              {productsWithSearch.map((product) => (
+                <CardWithImage
+                  key={product.id}
+                  {...product}
+                  fetchProducts={fetchProducts}
+                />
+              ))}
+            </SimpleGrid>
+            <Pagination
+              className="pagination-bar"
+              currentPage={currentPage}
+              totalCount={productListSize}
+              pageSize={8}
+              onPageChange={(page) => setCurrentPage(page)}
             />
-          ))}
-        </SimpleGrid>
-        <Pagination
-          className="pagination-bar"
-          currentPage={currentPage}
-          totalCount={productListSize}
-          pageSize={8}
-          onPageChange={(page) => setCurrentPage(page)}
-        />
+          </>
+        )}
       </Box>
     </SidebarWithHeader>
   );

@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import * as Yup from "yup";
 import CreateCustomerForm from "@/components/createCustomerForm";
 import { saveCustomer } from "@/lib/client";
+import Link from "next/link";
 
 const Signup = () => {
   const { customer, setCustomerFromToken } = useAuth();
@@ -62,9 +63,12 @@ const Signup = () => {
     saveCustomer(customer)
       .then((res) => {
         toast.success(`${customer.name} foi salvo com sucesso.`);
-        localStorage.setItem("access_token", res.headers["authorization"]);
+        const token = (res.headers["authorization"] || res.data?.token || "")
+          .replace(/^Bearer\s+/i, "")
+          .trim();
+        localStorage.setItem("access_token", token);
         setCustomerFromToken();
-        router.push("/cart");
+        router.push("/checkout");
       })
       .catch((err) => {
         toast.error(err.response.data.message);
@@ -74,9 +78,24 @@ const Signup = () => {
   return (
     <>
       {isClient ? (
-        <div className="md:container xl:max-w-screen-xl mx-auto py-12 p-2 md:px-6 mt-[8.5rem] min-h-[40vh]">
-          <h2 className="text-4xl font-semibold">Faça seu cadastro</h2>
-          <p className="mt-1 text-xl">Insira informações de nome e endereço</p>
+        <div className="md:container xl:max-w-screen-xl mx-auto p-2 py-6 md:px-6 md:py-12 mt-20 md:mt-[8.5rem] min-h-[40vh]">
+          <div className="mb-6 rounded-md border border-gray-100 bg-white p-5">
+            <p className="text-sm uppercase tracking-wide text-gray-500">
+              Cadastro
+            </p>
+            <h2 className="text-3xl md:text-4xl font-semibold">
+              Crie sua conta para comprar
+            </h2>
+            <p className="mt-2 text-base md:text-lg text-gray-600">
+              Esses dados ajudam a loja a confirmar contato, entrega e pagamento.
+            </p>
+            <Link
+              href="/login"
+              className="mt-3 inline-flex font-semibold text-black-1000 underline"
+            >
+              Já tenho conta
+            </Link>
+          </div>
           <CreateCustomerForm
             onSubmit={onSubmit}
             initialValues={initialValues}

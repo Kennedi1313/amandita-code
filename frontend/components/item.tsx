@@ -3,6 +3,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
+import { getProductImageUrl } from "@/lib/productClient";
 import {
   BsCart,
   BsCartCheck,
@@ -26,6 +27,12 @@ interface ItemProps {
   quantity: number;
   profileImageId: string;
   promo: number;
+  variations?: {
+    id: number;
+    price: string;
+    quantity: string;
+    promo: number;
+  }[];
 }
 
 export default function Item(props: ItemProps) {
@@ -57,6 +64,29 @@ export default function Item(props: ItemProps) {
   const storeInfo = useStoreInfo();
   if (!storeInfo) return null;
 
+  const hasVariations = props.variations && props.variations.length > 0;
+  const totalQuantity = hasVariations
+    ? props.variations!.reduce(
+        (total, variation) => total + Number(variation.quantity || 0),
+        0,
+      )
+    : props.quantity;
+  const prices = hasVariations
+    ? props.variations!
+        .map((variation) =>
+          Number(variation.price.replace(".", "").replace(",", ".")),
+        )
+        .filter((price) => price > 0)
+    : [];
+  const priceText =
+    prices.length > 0
+      ? `R$ ${Math.min(...prices).toFixed(2).replace(".", ",")} - R$ ${Math.max(
+          ...prices,
+        )
+          .toFixed(2)
+          .replace(".", ",")}`
+      : null;
+
   return (
     <div className="relative">
       <Link
@@ -65,7 +95,7 @@ export default function Item(props: ItemProps) {
       >
         <div className="h-[20rem] w-full relative">
           <Image
-            src={`https://d26zivezixyii1.cloudfront.net/profile-images/${props.id}/${props.profileImageId}.jpg`}
+            src={getProductImageUrl(props.id)}
             alt={props.name}
             quality={50}
             className="bg-gray-100 object-cover"
@@ -77,7 +107,11 @@ export default function Item(props: ItemProps) {
           <span className="text-md leading-5 font-thin text-gray-800">
             {props.name}
           </span>
-          <ProductPrice price={props.price} promo={props.promo}></ProductPrice>
+          {priceText ? (
+            <span className="font-semibold">{priceText}</span>
+          ) : (
+            <ProductPrice price={props.price} promo={props.promo}></ProductPrice>
+          )}
         </div>
       </Link>
 
@@ -103,7 +137,7 @@ export default function Item(props: ItemProps) {
         productUrl={"https://www." + storeInfo.domain + "/details/" + props.id}
       />
 
-      {props.quantity > 0 && props.promo > 0 ? (
+      {totalQuantity > 0 && props.promo > 0 && !hasVariations ? (
         <span className="font-bold text-[14px] absolute left-[3%] top-2 rounded-lg bg-brown-1000 py-2 px-4 text-white w-fit">
           -{props.promo}%
         </span>
@@ -111,7 +145,7 @@ export default function Item(props: ItemProps) {
         <></>
       )}
 
-      {props.quantity == 0 ? (
+      {totalQuantity == 0 ? (
         <span className="font-bold text-[14px] absolute left-[3%] w-[60%] top-2 rounded-lg bg-red-600 py-2 px-4 text-white md:w-fit">
           Produto Indisponível
         </span>
@@ -119,13 +153,12 @@ export default function Item(props: ItemProps) {
         <></>
       )}
 
-      {props.quantity == 0 ? (
+      {totalQuantity == 0 && storeInfo.whatsapp ? (
         <a
           href={
-            "https://api.whatsapp.com/send?phone=8498594171&text=Olá,%20tudo%20bem?%20Gostaria%20de%20ser%20avisado%20quando%20este%20produto%20chegar%20em%20estoque:%20https://www." +
-            storeInfo.domain +
-            "/details/" +
-            props.id
+            `https://api.whatsapp.com/send?phone=${storeInfo.whatsapp.replace(/\D/g, "")}&text=${encodeURIComponent(
+              `Olá, tudo bem? Gostaria de ser avisado quando este produto chegar em estoque: https://${storeInfo.domain}/details/${props.id}`,
+            )}`
           }
           target="blank"
           className="rounded-md flex flex-row text-white 

@@ -3,10 +3,7 @@ import Item from "../../components/item";
 import Pagination from "@/components/pagination";
 import { usePagination } from "@/components/Context/paginationContext";
 import { HomeProps, Product } from "@/types/ProductTypes";
-import {
-  getCategoriesNoStore,
-  getProductsByCategory,
-} from "@/lib/productClient";
+import { getProductsByCategory } from "@/lib/productClient";
 import Loading from "@/components/loading";
 const PAGE_SIZE = 8;
 const PROMO_PAGE_SIZE = 50;
@@ -35,7 +32,7 @@ export default function Home({ products, category, itemsCount }: HomeProps) {
 
   const renderProductList = () => (
     <div>
-      <div className="mt-[8.5rem] md:mt-36 md:max-w-screen-lg mx-auto flex items-center justify-center px-2 md:px-0 py-5 my-2">
+      <div className="mt-20 md:mt-36 md:max-w-screen-lg mx-auto flex items-center justify-center px-2 md:px-0 py-5 my-2">
         <div className="z-30 md:max-w-screen-lg mx-auto center grid lg:grid-cols-4 grid-cols-2 w-full gap-2 gap-y-4 min-h-[57rem]">
           {productList.map((item) => (
             <Item
@@ -47,6 +44,7 @@ export default function Home({ products, category, itemsCount }: HomeProps) {
               quantity={item.quantity}
               promo={item.promo}
               profileImageId={item.profileImageId}
+              variations={item.variations}
             />
           ))}
         </div>
@@ -81,14 +79,7 @@ export default function Home({ products, category, itemsCount }: HomeProps) {
 }
 
 export async function getStaticPaths() {
-  const data = await getCategoriesNoStore();
-  const categories = data.map((category: any) =>
-    category.path.split("/").pop(),
-  );
-  return {
-    paths: categories.map((category: any) => ({ params: { category } })),
-    fallback: false,
-  };
+  return { paths: [], fallback: "blocking" };
 }
 
 export const getStaticProps = async ({

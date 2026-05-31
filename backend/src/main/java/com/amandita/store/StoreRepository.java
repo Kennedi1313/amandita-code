@@ -8,4 +8,5 @@ import java.util.Optional;
 @Transactional
 public interface StoreRepository extends JpaRepository<Store, Long> {
     Optional<Store> findByDomain(String domain);
+    boolean existsByDomain(String domain);
 }

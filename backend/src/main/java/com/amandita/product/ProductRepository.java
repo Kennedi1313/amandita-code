@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 @Transactional
 public interface ProductRepository extends JpaRepository<Product, Integer> {
@@ -18,16 +19,23 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     void updateProfileImageId(String profileImageId, Integer productId);
     @Query("select p from Product p JOIN p.store s WHERE s.id = ?1")
     Page<Product> findAllByStore(Long storeId, Pageable pageable);
-    @Query("select p from Product p JOIN p.store s where p.category = :category AND s.id = :storeId")
-    Page<Product> findByCategoryByStore(String category, Pageable pageable, Long storeId);
-    @Query("select p from Product p where p.category = ?1")
+    Optional<Product> findByIdAndStoreId(Integer id, Long storeId);
+    Page<Product> findByStoreIdAndCategory(Long storeId, String category, Pageable pageable);
+    boolean existsByStoreIdAndCategory(Long storeId, String category);
     Page<Product> findByCategory(String category, Pageable pageable);
-    @Query("select p from Product p where p.category = ?1 and p.name like concat('%', ?2, '%')")
     Page<Product> findByCategoryAndNameContaining(String category, String name, Pageable pageable);
-    @Query("select p from Product p JOIN p.store s where unaccent(upper(p.name)) like unaccent(upper(concat('%', :name, '%'))) AND s.id = :storeId")
-    Page<Product> findByNameContainingIgnoreCaseByStore(String name, Pageable pageable, Long storeId);
-    @Query("select p from Product p where unaccent(upper(p.name)) like unaccent(upper(concat('%', ?1, '%')))")
+    Page<Product> findByStoreIdAndNameContainingIgnoreCase(Long storeId, String name, Pageable pageable);
     Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
+
+    @Query("SELECT CASE WHEN COUNT(si) > 0 THEN true ELSE false END FROM SaleItem si WHERE si.product.id = :productId")
+    boolean existsSaleItemByProductId(@Param("productId") Integer productId);
+
+    @Query("SELECT CASE WHEN COUNT(si) > 0 THEN true ELSE false END FROM SaleItem si WHERE si.variation.id = :variationId")
+    boolean existsSaleItemByVariationId(@Param("variationId") Integer variationId);
+
+    @Query("SELECT CASE WHEN COUNT(h) > 0 THEN true ELSE false END FROM History h WHERE h.product.id = :productId")
+    boolean existsHistoryByProductId(@Param("productId") Integer productId);
+
     @Modifying(clearAutomatically = true)
     @Transactional
     @Query(value = "INSERT INTO product_images (image_id, product_id) VALUES (?1, ?2)", nativeQuery = true)
@@ -39,5 +47,13 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     @Modifying
     @Query("DELETE FROM ProductImage pi WHERE pi.product.id = :productId AND pi.imageId = :imageId")
     void deleteProductImage(@Param("productId") Integer productId, @Param("imageId") String imageId);
+
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Product p SET p.category = :newCategory WHERE p.store.id = :storeId AND p.category = :oldCategory")
+    void updateCategoryByStore(
+            @Param("storeId") Long storeId,
+            @Param("oldCategory") String oldCategory,
+            @Param("newCategory") String newCategory
+    );
 
 }

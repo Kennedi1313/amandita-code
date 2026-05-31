@@ -1,78 +1,31 @@
-import {
-  Field,
-  Form,
-  Formik,
-  FormikProvider,
-  useField,
-  useFormik,
-} from "formik";
+import { FormikProvider, useFormik } from "formik";
 import * as Yup from "yup";
 import {
-  Alert,
-  AlertIcon,
   Box,
   Button,
   FormLabel,
-  Image,
-  Input,
-  Select,
   Stack,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
 import {
   getProductImagesById,
-  productsPictureUrl,
-  saveProduct,
   updateProduct,
-  uploadProductPicture,
 } from "../../services/product-client.js";
 import {
   errorNotification,
   successNotification,
 } from "../../services/notification.js";
-import { useCallback, useEffect, useState } from "react";
-import { useDropzone } from "react-dropzone";
-import CurrencyInput from "react-currency-input-field";
+import { useEffect, useState } from "react";
 import { getCategories } from "../../services/client.js";
 import { FiSave } from "react-icons/fi";
 import PriceInput from "./PriceInput.jsx";
 import MyTextInput from "./MyTextInput.jsx";
 import MySelectInput from "./MySelectInput.jsx";
 import MyDropzone from "./MyDropZone.jsx";
-import ProductVariationTable, {
-  prepareVariationsForSave,
-} from "./ProductVariationTable.jsx";
-import ProductVariations from "./ProductVariations.jsx";
-
-const predefinedVariations = [
-  { name: "cor", options: ["Azul", "Vermelho", "Verde"] },
-  { name: "tamanho", options: ["P", "M", "G"] },
-];
-
-const generateCombinations = (selectedVariations) => {
-  const variationNames = Object.keys(selectedVariations)
-    .filter(
-      (key) =>
-        Array.isArray(selectedVariations[key]) &&
-        selectedVariations[key].length > 0,
-    )
-    .sort(); // 🔥 garante ordem estável para geração da chave
-
-  if (variationNames.length === 0) return [];
-
-  const optionsArrays = variationNames.map((name) =>
-    selectedVariations[name].map((value) => ({ [name]: value })),
-  );
-
-  const cartesian = (arr) =>
-    arr.reduce(
-      (acc, curr) => acc.flatMap((a) => curr.map((b) => ({ ...a, ...b }))),
-      [{}],
-    );
-
-  return cartesian(optionsArrays);
-};
+import ProductVariationEditor, {
+  prepareSimpleVariationsForSave,
+} from "./ProductVariationEditor.jsx";
 
 const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
   let [categories, setCategories] = useState([]);
@@ -80,15 +33,43 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
   const [newImages, setNewImages] = useState([]);
   const [imagesToDelete, setImagesToDelete] = useState([]);
   const [hasNewThumb, setHasNewThumb] = useState(false);
-  // Variações
-  const [selectedVariations, setSelectedVariations] = useState({});
-  const [generatedCombos, setGeneratedCombos] = useState([]);
   const [variationData, setVariationData] = useState([]);
   const [productType, setProductType] = useState(
     initialValues.variations && initialValues.variations.length > 0
       ? "variable"
       : "single",
   );
+
+  const priceToCents = (value) => Number(String(value || "").replace(/\D/g, ""));
+
+  const validateProductBeforeSave = (updatedProduct, finalVariations) => {
+    if (existingImages.length + newImages.length === 0) {
+      return "Mantenha pelo menos uma imagem do produto.";
+    }
+
+    if (!updatedProduct.category) {
+      return "Selecione uma categoria.";
+    }
+
+    if (productType === "single" && priceToCents(updatedProduct.price) <= 0) {
+      return "Informe um preço de venda maior que zero.";
+    }
+
+    if (productType === "variable") {
+      if (finalVariations.length === 0) {
+        return "Adicione pelo menos uma opção de variação.";
+      }
+
+      const invalidVariation = finalVariations.find(
+        (variation) => priceToCents(variation.price) <= 0,
+      );
+      if (invalidVariation) {
+        return "Todas as variações precisam ter preço maior que zero.";
+      }
+    }
+
+    return "";
+  };
 
   useEffect(() => {
     getCategories()
@@ -111,56 +92,40 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
   }, []);
 
   useEffect(() => {
-    console.log(initialValues);
     if (!initialValues?.variations || initialValues.variations.length === 0) {
-      setGeneratedCombos([]);
       setVariationData([]);
       return;
     }
-
-    const selected = {};
-    const vData = [];
-
-    initialValues.variations.forEach((v, index) => {
-      selected[v.options.name];
-
-      vData.push({
-        options: v.options,
-        price: v.price,
-        quantity: v.quantity,
-        promo: v.promo,
-      });
-
-      Object.entries(v.options).forEach(([k, val]) => {
-        if (!selected[k]) selected[k] = [];
-        if (!selected[k].includes(val)) selected[k].push(val);
-      });
-    });
-
-    setSelectedVariations((prev) => ({
-      ...selected,
-    }));
-
-    const combos = generateCombinations(selected);
-    setGeneratedCombos(combos);
-    setVariationData(vData);
+    setVariationData(initialValues.variations);
   }, [initialValues]);
 
   const formik = useFormik({
     initialValues,
     validationSchema: Yup.object({
       name: Yup.string()
-        .max(50, "Must be 50 characters or less")
-        .required("Required"),
+        .max(50, "O nome não pode possuir mais que 50 caracteres")
+        .required("Obrigatório"),
+      category: Yup.string().required("Obrigatório"),
     }),
     onSubmit: async (updatedProduct, { setSubmitting }) => {
       setSubmitting(true);
 
       try {
-        const finalVariations = prepareVariationsForSave(
-          generatedCombos,
-          variationData,
+        const finalVariations =
+          productType === "variable"
+            ? prepareSimpleVariationsForSave(variationData)
+            : [];
+        const validationMessage = validateProductBeforeSave(
+          updatedProduct,
+          finalVariations,
         );
+
+        if (validationMessage) {
+          errorNotification("Revise o produto", validationMessage);
+          setSubmitting(false);
+          return;
+        }
+
         const productData = {
           name: updatedProduct.name,
           description: updatedProduct.description,
@@ -171,8 +136,6 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
           imagesToDelete: imagesToDelete,
           variations: finalVariations,
         };
-
-        console.log("Dados do produto a serem enviados:", productData);
 
         const formData = new FormData();
 
@@ -194,6 +157,8 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
           `${updatedProduct.name} foi atualizado com sucesso.`,
         );
         fetchProducts();
+        setNewImages([]);
+        setImagesToDelete([]);
       } catch (err) {
         console.error(err);
         errorNotification(
@@ -228,7 +193,7 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
           {/* CAMPOS BÁSICOS */}
           <Stack p={4} border="1px solid #eee" borderRadius="md">
             <MyTextInput
-              label="Name"
+              label="Nome"
               name="name"
               borderColor="#ebe5fc"
               focusBorderColor="#5f5482"
@@ -317,23 +282,12 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
               )}
 
               {productType === "variable" && (
-                <ProductVariations
-                  predefinedVariations={predefinedVariations}
-                  value={selectedVariations}
-                  onChange={(obj) => {
-                    setGeneratedCombos(generateCombinations(obj));
-                  }}
+                <ProductVariationEditor
+                  value={variationData}
+                  onChange={setVariationData}
                 />
               )}
             </Stack>
-
-            {productType === "variable" && (
-              <ProductVariationTable
-                generatedCombos={generatedCombos}
-                variationData={variationData}
-                setVariationData={setVariationData}
-              />
-            )}
           </Stack>
 
           <Button
@@ -343,6 +297,7 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
             padding="1.5rem"
             type="submit"
             leftIcon={<FiSave />}
+            isLoading={formik.isSubmitting}
           >
             Salvar alterações
           </Button>

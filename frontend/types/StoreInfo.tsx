@@ -14,6 +14,12 @@ export interface StoreInfo {
   mercadoPagoPublicKey: string;
   instagram: string;
   whatsapp: string;
+  pickupEnabled?: boolean;
+  localDeliveryEnabled?: boolean;
+  localDeliveryFee?: number;
+  freeShippingMinAmount?: number;
+  shippingOriginZip?: string;
+  localDeliveryEta?: string;
   createdAt: string;
   updatedAt: string;
   categories: Category[];

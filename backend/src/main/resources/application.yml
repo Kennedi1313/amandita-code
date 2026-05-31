@@ -5,7 +5,7 @@ server:
   ssl:
     key-store-type: PKCS12
     key-store: classpath:keystore/amandita.p12
-    key-store-password: Bota@1313
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD:}
     key-alias: amandita
     enabled: false
 
@@ -18,7 +18,7 @@ cors:
 aws:
   region: sa-east-1
   s3:
-    mock: false
+    mock: ${AWS_S3_MOCK:false}
     buckets:
       customer: amandita-uploads
       product: amandita-products-uploads
@@ -28,6 +28,23 @@ management:
     web:
       exposure:
         include: "health,info"
+
+google:
+  oauth:
+    client-id: ${GOOGLE_CLIENT_ID:}
+
+jwt:
+  secret: ${JWT_SECRET}
+
+asaas:
+  base-url: ${ASAAS_BASE_URL:https://api.asaas.com/v3}
+  api-key: ${ASAAS_API_KEY:}
+  webhook-token: ${ASAAS_WEBHOOK_TOKEN:}
+  return-base-url: ${ASAAS_RETURN_BASE_URL:}
+
+saas:
+  base-domain: ${SAAS_BASE_DOMAIN:mostradigital.com.br}
+  admin-url: ${SAAS_ADMIN_URL:https://admin.mostradigital.com.br}
 
 spring:
   datasource:
@@ -42,11 +59,15 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     show-sql: false
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 2
+    locations: classpath:db/migration
   main:
     web-application-type: servlet
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      max-file-size: 12MB
+      max-request-size: 12MB
   codec:
     max-in-memory-size: 10MB

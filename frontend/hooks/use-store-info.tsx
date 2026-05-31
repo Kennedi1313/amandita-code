@@ -1,34 +1,48 @@
 import { useState, useEffect } from "react";
-import axios from "axios";
 import { StoreInfo } from "../types/StoreInfo";
 import { getStoreInfo } from "@/lib/client";
+import { getCurrentStoreDomain } from "@/lib/productClient";
+
+const normalizeAssetPath = (value: string) => {
+  if (!value) return value;
+  if (value.match(/^https?:\/\//i)) return value;
+  const trimmed = value.startsWith("/") ? value.substring(1) : value;
+  return trimmed.replace(/\.png$/i, "");
+};
+
+const normalizeStoreInfo = (storeInfo: StoreInfo): StoreInfo => ({
+  ...storeInfo,
+  logoUrl: normalizeAssetPath(storeInfo.logoUrl),
+  bannerUrl: normalizeAssetPath(storeInfo.bannerUrl),
+  iconUrl: normalizeAssetPath(storeInfo.iconUrl),
+  categories: storeInfo.categories ?? [],
+});
 
 const useStoreInfo = (): StoreInfo | null => {
   const [storeInfo, setStoreInfo] = useState<StoreInfo | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    const cachedStore = localStorage.getItem("storeInfo");
+    const storeDomain = getCurrentStoreDomain();
+    const cacheKey = storeDomain ? `storeInfo:${storeDomain}` : "storeInfo";
+    const cachedStore = localStorage.getItem(cacheKey);
 
     if (cachedStore) {
-      const parsedStore = JSON.parse(cachedStore) as StoreInfo;
-
-      const updatedAt = new Date(parsedStore.updatedAt);
-      const now = new Date();
-      const diffInMs = now.getTime() - updatedAt.getTime();
-      const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
-
-      if (diffInDays < 1) {
-        setStoreInfo(parsedStore);
+      try {
+        const parsedStore = JSON.parse(cachedStore) as StoreInfo;
+        const normalizedStore = normalizeStoreInfo(parsedStore);
+        setStoreInfo(normalizedStore);
         setHasMounted(true);
-        return;
+      } catch {
+        localStorage.removeItem(cacheKey);
       }
     }
 
     getStoreInfo()
       .then((res) => {
-        setStoreInfo(res.data);
-        localStorage.setItem("storeInfo", JSON.stringify(res.data));
+        const normalizedStore = normalizeStoreInfo(res.data);
+        setStoreInfo(normalizedStore);
+        localStorage.setItem(cacheKey, JSON.stringify(normalizedStore));
       })
       .catch((err) => console.error("Failed to fetch store info:", err))
       .finally(() => {

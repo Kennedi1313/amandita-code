@@ -8,22 +8,26 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.lang.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Optional;
 
 @Component
 public class JWTAuthenticationFilter extends OncePerRequestFilter {
 
     private final JWTUtil jwtUtil;
     private final CustomerRepository customerRepository;
+    private final CustomerStoreRoleRepository customerStoreRoleRepository;
 
-    public JWTAuthenticationFilter(JWTUtil jwtUtil, CustomerRepository customerRepository) {
+    public JWTAuthenticationFilter(JWTUtil jwtUtil,
+                                   CustomerRepository customerRepository,
+                                   CustomerStoreRoleRepository customerStoreRoleRepository) {
         this.jwtUtil = jwtUtil;
         this.customerRepository = customerRepository;
+        this.customerStoreRoleRepository = customerStoreRoleRepository;
     }
 
     @Override
@@ -44,8 +48,31 @@ public class JWTAuthenticationFilter extends OncePerRequestFilter {
 
         if (subject != null &&
                 SecurityContextHolder.getContext().getAuthentication() == null) {
-            Customer userDetails = customerRepository.findCustomerByEmailByStore(subject, jwtUtil.getStoreId(jwt))
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found for store "));;
+            Long storeId = jwtUtil.getStoreId(jwt);
+            Optional<Customer> userDetailsResult = Optional.empty();
+
+            if (storeId != null) {
+                userDetailsResult = customerStoreRoleRepository.findCustomerByEmailStoreAndRole(subject, storeId, "ROLE_USER")
+                        .or(() -> customerStoreRoleRepository.findCustomerByEmailStoreAndRole(subject, storeId, "ROLE_ADMIN"));
+            }
+
+            if (userDetailsResult.isEmpty() && storeId == null) {
+                userDetailsResult = customerStoreRoleRepository.findMembershipsByEmailAndRole(subject, "ROLE_ADMIN")
+                        .stream()
+                        .findFirst()
+                        .map(CustomerStoreRole::getCustomer)
+                        .or(() -> customerRepository.findLegacyAdminByEmail(subject));
+            }
+
+            if (userDetailsResult.isEmpty()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            Customer userDetails = userDetailsResult.get();
+            if (storeId != null) {
+                userDetails.setEffectiveRoles(customerStoreRoleRepository.findRolesByCustomerAndStore(userDetails.getId(), storeId));
+            }
             if (jwtUtil.isTokenValid(jwt, userDetails.getUsername())) {
                 UsernamePasswordAuthenticationToken authenticationToken =
                         new UsernamePasswordAuthenticationToken(

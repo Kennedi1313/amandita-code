@@ -8,6 +8,7 @@ public class SaleRequest {
     private String customerEmail;
     private String paymentMethod;
     private BigDecimal shippingFee;
+    private String shippingMethod;
 
     public List<SaleItemRequest> getSaleItemRequests() {
         return saleItemRequests;
@@ -39,5 +40,13 @@ public class SaleRequest {
 
     public void setShippingFee(BigDecimal shippingFee) {
         this.shippingFee = shippingFee;
+    }
+
+    public String getShippingMethod() {
+        return shippingMethod;
+    }
+
+    public void setShippingMethod(String shippingMethod) {
+        this.shippingMethod = shippingMethod;
     }
 }
