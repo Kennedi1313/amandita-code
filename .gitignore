@@ -26,6 +26,11 @@
 *.pem
 /.idea
 **/.idea
+/.cloudflare/
+/.cloudflared/
+/.vscode/
+/backups/
+backup*.sql
 
 # debug
 npm-debug.log*

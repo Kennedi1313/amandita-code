@@ -70,8 +70,14 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
     volumes:
-      - ~/.cloudflared:/root/.cloudflared:ro
-    command: tunnel run
+      - ./.cloudflared:/etc/cloudflared:ro
+    command: tunnel --protocol http2 --origincert /etc/cloudflared/cert.pem --credentials-file /etc/cloudflared/ebc51f91-e4dd-4ee6-b4a7-f3c1a9395cf4.json run ebc51f91-e4dd-4ee6-b4a7-f3c1a9395cf4
+    networks:
+      - amandita-network
+    depends_on:
+      - amandita-api
+      - amandita-admin
+      - amandita-frontend
     restart: unless-stopped
 
 networks:
