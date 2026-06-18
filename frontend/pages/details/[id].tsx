@@ -77,6 +77,15 @@ export default function Details(props: Product) {
   const storeInfo = useStoreInfo();
   if (!storeInfo) return null;
 
+  const productUrl = "https://www." + storeInfo.domain + "/details/" + props.id;
+  const whatsappUrl =
+    "https://api.whatsapp.com/send?phone=+55" +
+    storeInfo.whatsapp +
+    "&text=" +
+    encodeURIComponent(
+      "Ola, tudo bem? Gostaria de comprar este produto: " + productUrl,
+    );
+
   return router.isFallback ? (
     <>
       <Head>
@@ -165,26 +174,42 @@ export default function Details(props: Product) {
                 </span>
               </a>
             ) : (
-              <div
-                className="rounded-md flex flex-row text-white 
-                                    bg-brown-1000 gap-2 justify-center items-center p-2 h-12 mt-2 w-full"
-                onClick={() => {
-                  isInCart() ? removeItemCart(props) : handleOnAddToCart();
-                }}
-              >
-                {isInCart() ? (
-                  <>
-                    {" "}
-                    <FiShoppingCart className="w-5 h-5 text-white"></FiShoppingCart>{" "}
-                    Remover do carrinho{" "}
-                  </>
-                ) : (
-                  <>
-                    <FiShoppingCart className="w-5 h-5 opacity-100 text-white"></FiShoppingCart>{" "}
-                    Adicionar ao carrinho{" "}
-                  </>
-                )}
-              </div>
+              <>
+                <a
+                  href={whatsappUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md flex flex-row text-white
+                                    bg-green-whatsapp gap-2 justify-center items-center p-2 h-12 mt-2 w-full"
+                >
+                  <BsWhatsapp className="w-5 h-5"></BsWhatsapp>
+                  <span className="font-bold text-[14px]">
+                    Comprar pelo WhatsApp
+                  </span>
+                </a>
+                {/*
+                <div
+                  className="rounded-md flex flex-row text-white 
+                                      bg-brown-1000 gap-2 justify-center items-center p-2 h-12 mt-2 w-full"
+                  onClick={() => {
+                    isInCart() ? removeItemCart(props) : handleOnAddToCart();
+                  }}
+                >
+                  {isInCart() ? (
+                    <>
+                      {" "}
+                      <FiShoppingCart className="w-5 h-5 text-white"></FiShoppingCart>{" "}
+                      Remover do carrinho{" "}
+                    </>
+                  ) : (
+                    <>
+                      <FiShoppingCart className="w-5 h-5 opacity-100 text-white"></FiShoppingCart>{" "}
+                      Adicionar ao carrinho{" "}
+                    </>
+                  )}
+                </div>
+                */}
+              </>
             )}
             <div
               className="rounded-md border-[1px] border-rose-400 flex flex-row text-white 

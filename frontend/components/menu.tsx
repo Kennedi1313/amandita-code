@@ -78,6 +78,7 @@ export default function Menu() {
                 {category.name}
               </Link>
             ))}
+            {/*
             <Link
               className="flex w-1/2 md:left-0 md:relative md:hidden justify-left gap-2 fixed bottom-10 left-0 px-2 py-2 bg-white text-sm"
               href="/sales"
@@ -98,6 +99,7 @@ export default function Menu() {
               <FiUser className="text-base font-bold text-black-1000"></FiUser>
               Minha conta
             </Link>
+            */}
           </div>
         </div>
       </menu>
@@ -139,6 +141,7 @@ export default function Menu() {
           <Link className="flex justify-end" href="/favorites">
             <FiHeart className="text-2xl font-bold text-rose-400"></FiHeart>
           </Link>
+          {/*
           <Link
             className="flex justify-center text-center items-end"
             href="/cart"
@@ -160,6 +163,7 @@ export default function Menu() {
           >
             <FiUser className="text-2xl font-bold text-black-1000"></FiUser>
           </Link>
+          */}
         </div>
       </div>
     </div>
