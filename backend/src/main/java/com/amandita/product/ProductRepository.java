@@ -24,10 +24,36 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     Page<Product> findByCategory(String category, Pageable pageable);
     @Query("select p from Product p where p.category = ?1 and p.name like concat('%', ?2, '%')")
     Page<Product> findByCategoryAndNameContaining(String category, String name, Pageable pageable);
-    @Query("select p from Product p JOIN p.store s where unaccent(upper(p.name)) like unaccent(upper(concat('%', :name, '%'))) AND s.id = :storeId")
-    Page<Product> findByNameContainingIgnoreCaseByStore(String name, Pageable pageable, Long storeId);
-    @Query("select p from Product p where unaccent(upper(p.name)) like unaccent(upper(concat('%', ?1, '%')))")
-    Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
+    @Query(
+            value = """
+                    select p.*
+                    from product p
+                    join store s on p.store_id = s.id
+                    where unaccent(upper(p.name)) like unaccent(upper(concat('%', :name, '%')))
+                      and s.id = :storeId
+                    """,
+            countQuery = """
+                    select count(*)
+                    from product p
+                    join store s on p.store_id = s.id
+                    where unaccent(upper(p.name)) like unaccent(upper(concat('%', :name, '%')))
+                      and s.id = :storeId
+                    """,
+            nativeQuery = true)
+    Page<Product> findByNameContainingIgnoreCaseByStore(@Param("name") String name, Pageable pageable, @Param("storeId") Long storeId);
+    @Query(
+            value = """
+                    select p.*
+                    from product p
+                    where unaccent(upper(p.name)) like unaccent(upper(concat('%', :name, '%')))
+                    """,
+            countQuery = """
+                    select count(*)
+                    from product p
+                    where unaccent(upper(p.name)) like unaccent(upper(concat('%', :name, '%')))
+                    """,
+            nativeQuery = true)
+    Page<Product> findByNameContainingIgnoreCase(@Param("name") String name, Pageable pageable);
     @Modifying(clearAutomatically = true)
     @Transactional
     @Query(value = "INSERT INTO product_images (image_id, product_id) VALUES (?1, ?2)", nativeQuery = true)

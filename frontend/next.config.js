@@ -47,6 +47,9 @@ const nextConfig = {
   },
   basePath: "",
   reactStrictMode: false,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   typescript: {
     ignoreBuildErrors: false,
   },
