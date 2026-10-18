@@ -1,5 +1,5 @@
-import React, { useCallback } from "react";
-import { Box, Flex, Image, Stack, IconButton } from "@chakra-ui/react";
+import React, { useCallback, useState } from "react";
+import { Box, Flex, Image, Stack, IconButton, Text } from "@chakra-ui/react";
 import { useDropzone } from "react-dropzone";
 import { FiUpload, FiX } from "react-icons/fi";
 
@@ -11,6 +11,9 @@ const MyDropzone = ({
   setImagesToDelete, // ids de imagens antigas a remover
   setHasNewThumb, // controla se há nova imagem para ser a principal
 }) => {
+  const [imageLimitMessage, setImageLimitMessage] = useState("");
+  const remainingSlots = Math.max(0, 5 - existingImages.length - newImages.length);
+
   const removeExistingImage = (imageToRemove) => {
     console.log("deleting image: ");
     console.log(imageToRemove.id);
@@ -26,7 +29,12 @@ const MyDropzone = ({
   };
 
   const onDrop = useCallback(
-    (acceptedFiles) => {
+    (acceptedFiles, rejectedFiles) => {
+      if (rejectedFiles.length > 0) {
+        setImageLimitMessage("Cada produto pode ter no máximo 5 imagens. Use JPG, PNG ou HEIC.");
+      } else {
+        setImageLimitMessage("");
+      }
       const filesWithPreview = acceptedFiles.map((file) =>
         Object.assign(file, {
           preview: URL.createObjectURL(file),
@@ -40,6 +48,8 @@ const MyDropzone = ({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { "image/*": [".jpeg", ".jpg", ".png", ".heic", ".heif"] },
+    maxFiles: Math.max(remainingSlots, 1),
+    disabled: remainingSlots === 0,
     onDrop,
   });
 
@@ -56,7 +66,7 @@ const MyDropzone = ({
             const key = isExisting
               ? item.data.id
               : item.data.name + item.data.preview;
-            const borderColor = isLast ? "#5f5482" : "#eee";
+            const borderColor = isLast ? "#1f633c" : "#eee";
 
             return (
               <Box
@@ -98,12 +108,14 @@ const MyDropzone = ({
         w="100%"
         textAlign="center"
         border="dashed"
-        borderColor="#5f5482"
+        borderColor="#1f633c"
         borderRadius="3xl"
         fontWeight="bold"
-        color="#5f5482"
+        color={remainingSlots === 0 ? "gray.500" : "#1f633c"}
         p={6}
         rounded="md"
+        cursor={remainingSlots === 0 ? "not-allowed" : "pointer"}
+        opacity={remainingSlots === 0 ? 0.65 : 1}
       >
         <input {...getInputProps()} />
         {isDragActive ? (
@@ -111,10 +123,19 @@ const MyDropzone = ({
         ) : (
           <Stack textAlign="center" alignContent="center">
             <FiUpload style={{ width: "100%", fontWeight: "bold" }} />
-            <p>Arraste e solte imagens aqui, ou clique para selecionar</p>
+            <p>
+              {remainingSlots === 0
+                ? "Limite de 5 imagens atingido"
+                : `Adicione imagens (${existingImages.length + newImages.length}/5). Restam ${remainingSlots}.`}
+            </p>
           </Stack>
         )}
       </Box>
+      {imageLimitMessage && (
+        <Text mt={2} color="orange.600" fontSize="sm" role="status">
+          {imageLimitMessage}
+        </Text>
+      )}
     </>
   );
 };

@@ -5,8 +5,8 @@ const PriceInput = ({ label, value, onChange, name, id }) => {
   return (
     <>
       <FormLabel htmlFor={id || name}>{label}</FormLabel>
-      <InputGroup focusBorderColor="#5f5482">
-        <InputLeftAddon backgroundColor="#ebe5fc">R$</InputLeftAddon>
+      <InputGroup focusBorderColor="#1f633c">
+        <InputLeftAddon backgroundColor="#e4f2d5">R$</InputLeftAddon>
         <Input
           as={NumericFormat}
           name={name}
@@ -21,8 +21,8 @@ const PriceInput = ({ label, value, onChange, name, id }) => {
           fixedDecimalScale
           allowNegative={false}
           placeholder="Digite o preço de venda do produto"
-          borderColor="#ebe5fc"
-          focusBorderColor="#5f5482"
+          borderColor="#e4f2d5"
+          focusBorderColor="#1f633c"
           width="100%"
         />
       </InputGroup>

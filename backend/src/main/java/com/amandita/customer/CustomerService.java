@@ -11,6 +11,9 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientException;
+import java.net.URI;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -244,6 +247,38 @@ public class CustomerService {
         } catch (IOException e) {
             throw new RuntimeException("failed to upload profile image", e);
         }
+        customerDao.updateCustomerProfileImageId(profileImageId, customerId);
+    }
+
+    public void importGoogleProfileImage(Integer customerId, String imageUrl) {
+        URI uri;
+        try {
+            uri = URI.create(imageUrl);
+        } catch (IllegalArgumentException exception) {
+            return;
+        }
+
+        String host = uri.getHost();
+        if (!"googleusercontent.com".equals(host)
+                && (host == null || !host.endsWith(".googleusercontent.com"))) {
+            return;
+        }
+
+        byte[] image;
+        try {
+            image = new RestTemplate().getForObject(uri, byte[].class);
+        } catch (RestClientException exception) {
+            return;
+        }
+        if (image == null || image.length == 0 || image.length > 5 * 1024 * 1024) {
+            return;
+        }
+
+        String profileImageId = UUID.randomUUID().toString();
+        s3Service.putObject(
+                s3Buckets.getCustomer(),
+                "profile-images/%s/%s.jpg".formatted(customerId, profileImageId),
+                image);
         customerDao.updateCustomerProfileImageId(profileImageId, customerId);
     }
 

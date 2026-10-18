@@ -75,6 +75,8 @@ docker compose up --build
 
 ## Agent development best practices
 
+Code readability is mandatory. Never leave source files compressed into one-line or excessively long lines. Keep JSX, markup, object literals, conditionals, and chained calls formatted with natural line breaks and indentation so the code is easy to review and maintain. Run the project's formatter on changed files when available before finalizing work.
+
 Code changes:
 - Make small, incremental changes with one objective per commit; prioritize safety and minimal surface area.
 - When proposing changes, list affected services, files, and API contract impacts; request user confirmation for breaking or cross-service changes.

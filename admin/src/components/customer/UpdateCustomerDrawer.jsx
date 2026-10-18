@@ -50,7 +50,7 @@ const UpdateCustomerDrawer = ({
           <DrawerFooter>
             <Button
               leftIcon={<CloseIcon />}
-              colorScheme={"teal"}
+              colorScheme={"brand"}
               onClick={onClose}
             >
               Close

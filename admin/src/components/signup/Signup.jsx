@@ -17,13 +17,13 @@ const Signup = () => {
   return (
     <Stack
       minH={"100vh"}
-      backgroundColor={"#5f5482"}
+      backgroundColor={"#1f633c"}
       direction={{ base: "column", md: "row" }}
     >
       <Flex p={8} flex={1} alignItems={"center"} justifyContent={"center"}>
         <Stack spacing={4} w={"full"} maxW={"md"}>
           <Image
-            src="logo.png"
+            src="/brand-mark-dark.png"
             alt="Logo"
             boxSize="150px"
             objectFit="contain"
@@ -34,7 +34,7 @@ const Signup = () => {
             w={"full"}
             maxW={"md"}
             backgroundColor={"white"}
-            color={"#5f5482"}
+            color={"#1f633c"}
             padding={"2rem"}
             rounded={"lg"}
           >

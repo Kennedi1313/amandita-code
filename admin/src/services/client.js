@@ -46,6 +46,13 @@ export const getCustomers = async () => {
   }
 };
 
+export const getCustomerByEmail = async (email) => {
+  return axios.get(
+    `${getUrl()}/api/v1/customers/email/${encodeURIComponent(email)}`,
+    getAuthConfig(),
+  );
+};
+
 export const saveCustomer = async (customer) => {
   try {
     return await axios.post(
@@ -125,6 +132,21 @@ export const getCategories = async () => {
   }
 };
 
+export const getStorePlan = async () =>
+  axios.get(`${getUrl()}/api/v1/store/plan`, getStoreConfig());
+
+export const startStoreSubscription = async (payerEmail) =>
+  axios.post(`${getUrl()}/api/v1/store/plan/subscription`, { payerEmail }, getAuthConfig());
+
+export const syncStoreSubscription = async () =>
+  axios.post(`${getUrl()}/api/v1/store/plan/subscription/sync`, {}, getAuthConfig());
+
+export const cancelStoreSubscription = async () =>
+  axios.delete(`${getUrl()}/api/v1/store/plan/subscription`, getAuthConfig());
+
+export const switchStoreToFree = async () =>
+  axios.post(`${getUrl()}/api/v1/store/plan/subscription/free`, {}, getAuthConfig());
+
 export const createCategory = async (name) => {
   try {
     return await axios.post(
@@ -162,7 +184,7 @@ export const deleteCategory = async (id) => {
 
 export const getStoreInfo = async () => {
   try {
-    const response = await axios.get(`${getUrl()}/api/v1/store/info`, getStoreConfig());
+    const response = await axios.get(`${getUrl()}/api/v1/store/settings`, getStoreConfig());
     if (response.data?.domain) {
       localStorage.setItem("store_domain", response.data.domain);
     }
@@ -197,6 +219,27 @@ export const updateStoreInfo = async (store) => {
   }
 };
 
+export const findAddressByCep = async (cep) => {
+  const normalizedCep = String(cep || "").replace(/\D/g, "");
+  if (!/^\d{8}$/.test(normalizedCep)) {
+    throw new Error("Informe um CEP válido com 8 números.");
+  }
+  return axios.get(`https://viacep.com.br/ws/${normalizedCep}/json/`);
+};
+
+export const createAsaasSubaccount = async (details) =>
+  axios.post(
+    `${getUrl()}/api/v1/store/asaas/subaccount`,
+    details,
+    getAuthConfig(),
+  );
+
+export const getMercadoPagoConnectUrl = async () =>
+  axios.get(`${getUrl()}/api/v1/store/mercadopago/connect`, getAuthConfig());
+
+export const getMelhorEnvioAuthorizeUrl = async () =>
+  axios.get(`${getUrl()}/api/v1/melhorenvio/authorize-url`, getAuthConfig());
+
 export const uploadStoreImage = async (type, file) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -226,12 +269,16 @@ export const getUrl = () => {
   const runtimeUrl = import.meta.env.VITE_API_RUNTIME_URL;
 
   if (typeof window !== "undefined") {
-    if (runtimeUrl) {
-      return runtimeUrl.replace(/\/+$/, "");
+    const browserRuntimeUrl = runtimeUrl || DEFAULT_ADMIN_API_RUNTIME_URL;
+    const localRuntimeUrl = /^https?:\/\/(?:localhost|127(?:\.\d{1,3}){3})(?::(\d+))?$/i.exec(
+      browserRuntimeUrl,
+    );
+
+    if (localRuntimeUrl) {
+      return `${window.location.protocol}//${window.location.hostname}:${localRuntimeUrl[1] || "8080"}`;
     }
-    return buildUrl
-      ? buildUrl.replace(/\/+$/, "")
-      : DEFAULT_ADMIN_API_RUNTIME_URL;
+
+    return browserRuntimeUrl.replace(/\/+$/, "");
   }
 
   return buildUrl

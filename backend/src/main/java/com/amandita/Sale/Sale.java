@@ -48,9 +48,25 @@ public class Sale {
     @Column(name = "payment_id")
     private String paymentId;
 
+    @Column(name = "stock_decremented", nullable = false)
+    private boolean stockDecremented;
+
     private String status;
 
     private Boolean shipment;
+    private String shippingMethod;
+    private Integer shippingFee;
+    private String shippingZip;
+    @Column(columnDefinition = "text")
+    private String shippingQuote;
+    @Column(name = "melhor_envio_shipment_id")
+    private String melhorEnvioShipmentId;
+    @Column(name = "melhor_envio_tracking_code")
+    private String melhorEnvioTrackingCode;
+    @Column(name = "melhor_envio_label_url", columnDefinition = "text")
+    private String melhorEnvioLabelUrl;
+    @Column(name = "melhor_envio_status")
+    private String melhorEnvioStatus;
 
     @ManyToOne
     @JoinColumn(name = "store_id")
@@ -139,6 +155,14 @@ public class Sale {
         this.paymentId = paymentId;
     }
 
+    public boolean isStockDecremented() {
+        return stockDecremented;
+    }
+
+    public void setStockDecremented(boolean stockDecremented) {
+        this.stockDecremented = stockDecremented;
+    }
+
     public Boolean getShipment() {
         return shipment;
     }
@@ -146,6 +170,23 @@ public class Sale {
     public void setShipment(Boolean shipment) {
         this.shipment = shipment;
     }
+
+    public String getShippingMethod() { return shippingMethod; }
+    public void setShippingMethod(String shippingMethod) { this.shippingMethod = shippingMethod; }
+    public Integer getShippingFee() { return shippingFee; }
+    public void setShippingFee(Integer shippingFee) { this.shippingFee = shippingFee; }
+    public String getShippingZip() { return shippingZip; }
+    public void setShippingZip(String shippingZip) { this.shippingZip = shippingZip; }
+    public String getShippingQuote() { return shippingQuote; }
+    public void setShippingQuote(String shippingQuote) { this.shippingQuote = shippingQuote; }
+    public String getMelhorEnvioShipmentId() { return melhorEnvioShipmentId; }
+    public void setMelhorEnvioShipmentId(String melhorEnvioShipmentId) { this.melhorEnvioShipmentId = melhorEnvioShipmentId; }
+    public String getMelhorEnvioTrackingCode() { return melhorEnvioTrackingCode; }
+    public void setMelhorEnvioTrackingCode(String melhorEnvioTrackingCode) { this.melhorEnvioTrackingCode = melhorEnvioTrackingCode; }
+    public String getMelhorEnvioLabelUrl() { return melhorEnvioLabelUrl; }
+    public void setMelhorEnvioLabelUrl(String melhorEnvioLabelUrl) { this.melhorEnvioLabelUrl = melhorEnvioLabelUrl; }
+    public String getMelhorEnvioStatus() { return melhorEnvioStatus; }
+    public void setMelhorEnvioStatus(String melhorEnvioStatus) { this.melhorEnvioStatus = melhorEnvioStatus; }
 
     public Store getStore() {
         return store;

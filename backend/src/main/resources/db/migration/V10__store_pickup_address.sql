@@ -1,0 +1,2 @@
+ALTER TABLE store
+    ADD COLUMN IF NOT EXISTS pickup_address JSONB;

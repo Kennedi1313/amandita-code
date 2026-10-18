@@ -105,7 +105,7 @@ const Product = () => {
 
   return (
     <SidebarWithHeader>
-      <Box maxW="7xl" mx="auto" px={{ base: 2, md: 6 }} py={{ base: 4, md: 8 }}>
+      <Box maxW="7xl" mx="auto" px={{ base: 0, md: 6 }} py={{ base: 3, md: 8 }}>
         <PageHeader
           title="Produtos"
           description="Cadastre, filtre e mantenha estoque, preço e imagens da vitrine."
@@ -122,8 +122,8 @@ const Product = () => {
           <Box>
             <Select
               id="category"
-              focusBorderColor="#5f5482"
-              borderColor="#ebe5fc"
+              focusBorderColor="#1f633c"
+              borderColor="brand.400"
               onChange={handleCategoryChange}
               value={category}
               placeholder="Categorias"
@@ -148,7 +148,7 @@ const Product = () => {
               <Stack
                 width={"full"}
                 display={"flex"}
-                flexDirection={"row"}
+                flexDirection={{ base: "column", sm: "row" }}
                 justify={"center"}
                 gap={"2"}
                 align={"center"}
@@ -158,17 +158,17 @@ const Product = () => {
                     <Input
                       {...field}
                       type="text"
-                      focusBorderColor="#5f5482"
-                      borderColor="#ebe5fc"
+                      focusBorderColor="#1f633c"
+                      borderColor="brand.400"
                       placeholder="Pesquisar por nome"
                     />
                   )}
                 </Field>
                 <Button
                   type="submit"
-                  backgroundColor="#ebe5fc"
-                  color={"#5f5482"}
-                  style={{ margin: "0", padding: "1.2rem" }}
+                  colorScheme="brand"
+                  width={{ base: "full", sm: "max-content" }}
+                  style={{ margin: "0", padding: "1.2rem 2rem" }}
                 >
                   Pesquisar
                 </Button>
@@ -176,8 +176,8 @@ const Product = () => {
                   <Button
                     type="button"
                     variant="ghost"
-                    color={"#5f5482"}
-                    marginTop={0}
+                    color={"#1f633c"}
+                    style={{ margin: "0", padding: "1.2rem 2rem" }}
                     onClick={() => {
                       setCurrentPage(0);
                       setSearchTerm("");
@@ -207,13 +207,13 @@ const Product = () => {
             borderColor="gray.100"
             borderRadius="md"
             bg="white"
-            p={{ base: 6, md: 10 }}
+            p={{ base: 4, md: 10 }}
             textAlign="center"
           >
             <Icon
               as={searchTerm || category ? FiSearch : FiPackage}
               boxSize={10}
-              color="#5f5482"
+              color="#1f633c"
             />
             <Text mt={3} fontWeight="bold" fontSize="xl">
               {searchTerm || category
@@ -229,7 +229,7 @@ const Product = () => {
               <Button
                 mt={4}
                 variant="outline"
-                colorScheme="purple"
+                colorScheme="brand"
                 onClick={() => {
                   setCurrentPage(0);
                   setCategory("");
@@ -243,7 +243,7 @@ const Product = () => {
         )}
 
         {/* Products Display */}
-        <Text marginTop={"8px"} textColor={"#5f5482"} fontWeight={"semibold"}>
+        <Text marginY={"8px"} textColor={"#1f633c"} fontWeight={"semibold"}>
           {productListSize} produtos
         </Text>
         {productsWithSearch.length > 0 && (

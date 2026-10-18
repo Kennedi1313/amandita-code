@@ -56,6 +56,10 @@ public class CheckoutProService {
         sale.setSaleItems(saleItems);
         sale.setCustomer(customer);
         sale.setShipment(!Objects.equals(request.getShippingFee(), BigDecimal.ZERO));
+        sale.setShippingMethod(request.getShippingMethod());
+        sale.setShippingFee(request.getShippingFee() == null ? 0 : request.getShippingFee().intValue());
+        sale.setShippingZip(request.getShippingZip());
+        sale.setShippingQuote(request.getShippingQuote());
         sale.setPaymentMethod(request.getPaymentMethod());
         sale.setStore(store);
     }
@@ -323,6 +327,7 @@ public class CheckoutProService {
     }
 
     private void decrementStock(Sale sale) {
+        if (sale.isStockDecremented()) return;
         sale.getSaleItems().forEach(saleItem -> {
             if (saleItem.getVariation() != null) {
                 ProductVariation variation = saleItem.getVariation();
@@ -332,6 +337,7 @@ public class CheckoutProService {
             }
             productDao.updateProduct(saleItem.getProduct());
         });
+        sale.setStockDecremented(true);
     }
 
     private record PricedSaleItem(SaleItem saleItem, int unitPriceInCents) {

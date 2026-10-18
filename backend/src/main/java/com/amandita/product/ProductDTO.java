@@ -12,6 +12,11 @@ public record ProductDTO(
     String category,
     String profileImageId,
     Integer promo,
+    boolean published,
     List<String> imagesIds,
-    List<ProductVariationDTO> variations
+    List<ProductVariationDTO> variations,
+    java.math.BigDecimal weightKg,
+    Integer widthCm,
+    Integer heightCm,
+    Integer lengthCm
 ) { }

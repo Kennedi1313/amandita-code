@@ -14,8 +14,21 @@ const normalizeStoreInfo = (storeInfo: StoreInfo): StoreInfo => ({
   ...storeInfo,
   logoUrl: normalizeAssetPath(storeInfo.logoUrl),
   bannerUrl: normalizeAssetPath(storeInfo.bannerUrl),
+  bannerMobileUrl: storeInfo.bannerMobileUrl
+    ? normalizeAssetPath(storeInfo.bannerMobileUrl)
+    : "",
   iconUrl: normalizeAssetPath(storeInfo.iconUrl),
   categories: storeInfo.categories ?? [],
+  checkoutEnabled: storeInfo.plan === "COMPLETE" && (
+    (storeInfo.pickupEnabled !== false && Boolean(
+      storeInfo.pickupAddress?.zip?.trim() && storeInfo.pickupAddress?.street?.trim() &&
+      storeInfo.pickupAddress?.number?.trim() && storeInfo.pickupAddress?.district?.trim() &&
+      storeInfo.pickupAddress?.city?.trim(),
+    )) ||
+    (storeInfo.localDeliveryEnabled !== false && Boolean(
+      storeInfo.shippingOriginZip?.replace(/\D/g, "").length === 8 &&
+      (storeInfo.deliveryDistanceRanges?.length || 0) > 0,
+    ))),
 });
 
 const useStoreInfo = (): StoreInfo | null => {

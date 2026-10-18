@@ -34,9 +34,9 @@ const CreateCustomerForm = ({
         }}
       >
         {({ isValid, values, setFieldValue }) => (
-          <Form className="mx-auto flex flex-col gap-2 md:px-0 py-5 my-2">
+          <Form className="mx-auto flex flex-col gap-2 md:px-0">
             <div className="flex flex-col md:flex-row align-top w-full justify-around gap-4">
-              <div className="mx-auto flex flex-col gap-2 md:py-5 my-2 w-full bg-white rounded-2xl px-4 py-6">
+              <div className="mx-auto flex flex-col gap-2 md:py-5 md:px-4 my-2 w-full bg-white rounded-2xl py-6">
                 <h1 className="text-2xl font-semibold mb-4 flex gap-2">
                   <FiUser></FiUser> Informações Pessoais
                 </h1>
@@ -78,7 +78,7 @@ const CreateCustomerForm = ({
                   }
                 />
               </div>
-              <div className="mx-auto flex flex-col gap-2 md:py-5 my-2 w-full bg-white rounded-2xl px-4 py-6">
+              <div className="mx-auto flex flex-col gap-2 md:py-5 md:px-4 my-2 w-full bg-white rounded-2xl py-6">
                 <h1 className="text-2xl font-semibold my-4 flex gap-2">
                   <FiTruck></FiTruck> Endereço Para Entrega
                 </h1>

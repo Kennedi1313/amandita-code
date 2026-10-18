@@ -71,8 +71,11 @@ const AuthProvider = ({ children }: any) => {
       performGoogleLogin(credential)
         .then((res) => {
           const jwtToken = normalizeAccessToken(
-            res.headers["authorization"] || res.data?.token,
+            res.data?.token || res.headers["authorization"],
           );
+          if (!jwtToken) {
+            throw new Error("A API não retornou um token de acesso.");
+          }
           localStorage.setItem("access_token", jwtToken);
 
           const decodedToken = jwtDecode.default<any>(jwtToken);

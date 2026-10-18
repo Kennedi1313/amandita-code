@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
+  Avatar,
   CloseButton,
   Drawer,
   DrawerContent,
@@ -11,7 +12,6 @@ import {
   IconButton,
   Image,
   Link,
-  Menu,
   Stack,
   Text,
   useBreakpointValue,
@@ -24,11 +24,16 @@ import {
   FiLogOut,
   FiMenu,
   FiPackage,
+  FiTruck,
+  FiCreditCard,
+  FiLayers,
   FiSettings,
   FiTag,
   FiUsers,
 } from "react-icons/fi";
+import { FaWhatsapp } from "react-icons/fa";
 
+import { Link as RouterLink, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { getStorefrontUrl, getStoreInfo } from "../../services/client.js";
 
@@ -40,38 +45,38 @@ export default function SidebarWithHeader({ children }) {
       {!isDesktop ? (
         <Drawer
           autoFocus={false}
-          placement={"right"}
+          placement="left"
           isOpen={isOpen}
           onClose={onClose}
           returnFocusOnClose={false}
           onOverlayClick={onClose}
-          size="xs"
+          size="full"
         >
-          <DrawerContent>
+          <DrawerContent maxW="100vw" minH="100vh">
             <SidebarContent onClose={onClose} />
           </DrawerContent>
         </Drawer>
       ) : (
         <Box
-          w="15%"
-          maxW={"15%"}
+          w="300px"
           pos="fixed"
           h="100vh"
           borderRight="1px solid"
-          borderColor="gray.200"
-          bg="white"
+          borderColor="#103d2b"
+          bg="#082f1e"
+          boxShadow="xl"
         >
           <SidebarContent onClose={() => {}} />
         </Box>
       )}
 
-      <MobileNav onClose={() => onClose} onOpen={onOpen} />
+      <MobileNav onOpen={onOpen} />
       <Box
-        ml={{ base: 0, md: "15%" }} // aplica margem só no desktop
-        p="2"
-        pt="16"
-        w={{ base: "100%", md: "85%" }} // ocupa 85% quando o menu está fixo
-        maxW={{ base: "full", lg: "85%" }}
+        ml={{ base: 0, lg: "300px" }}
+        px={{ base: 3, md: 7, xl: 10 }}
+        py={{ base: 3, lg: 8 }}
+        pt={{ base: 16, lg: 8 }}
+        w={{ base: "full", lg: "calc(100% - 300px)" }}
         mx="auto"
       >
         {children}
@@ -101,77 +106,94 @@ const SidebarContent = ({ onClose, ...rest }) => {
 
   const configuracao = [
     {
-      name: "Loja",
+      name: "Personalização",
       route: "/dashboard/store",
       icon: FiSettings,
     },
+    { name: "Recebimentos", route: "/dashboard/payments", icon: FiCreditCard },
+    { name: "Frete", route: "/dashboard/shipping", icon: FiTruck },
+    { name: "Plano e cobrança", route: "/dashboard/plan", icon: FiLayers },
     { name: "Categorias", route: "/dashboard/categories", icon: FiTag },
   ];
   return (
     <Stack
-      transition="3s ease"
-      backgroundColor={"#5F5482"}
-      textColor={"white"}
-      w={{ base: "full", md: "15%" }}
-      pos="fixed"
+      transition="all 150ms ease"
+      backgroundColor="#082f1e"
+      color="white"
+      w="full"
+      pos="relative"
       h="full"
+      overflowY="auto"
       {...rest}
     >
       <Flex
-        flexDirection="column"
-        alignItems="center"
-        mx="8"
-        mt={2}
-        justifyContent="space-between"
+        align="center"
+        justify="space-between"
+        px={5}
+        pt={5}
+        pb={4}
       >
+        <HStack spacing={3}>
+          <Image
+            src="/brand-mark-dark.png"
+            alt="KIZI"
+            boxSize="60px"
+            objectFit="contain"
+          />
+          <Box>
+            <Text fontSize="sm" fontWeight="bold" color="white">
+              KIZI
+            </Text>
+            <Text fontSize="xs" color="whiteAlpha.600">
+              PAINEL DA LOJA
+            </Text>
+          </Box>
+        </HStack>
         <CloseButton display={{ base: "flex", md: "none" }} onClick={onClose} />
       </Flex>
-      <Flex
-        display={{ base: "none", md: "flex" }}
-        justifyContent={"start"}
-        px={4}
-        gap={4}
-        alignSelf={"center"}
-        rounded={"md"}
-        backgroundColor={"#5F5482"}
-        textColor={"white"}
-        w={{ base: "full", md: "full" }}
-        h="35px"
-      >
-        <Image
-          src="/icon_sem_fundo.png"
-          alt="Logo"
-          boxSize="35px"
-          objectFit="contain"
-          alignSelf="center"
-        />
-        <Text alignSelf={"center"}>Mostra Digital</Text>
-      </Flex>
 
-      <Stack pl={4} pr={4} gap={2} pt={8}>
-        <NavItem route={"/dashboard"} icon={FiHome}>
-          {"Inicio"}
+      <Stack px={3} gap={1} pt={3} flex="1">
+        <Text px={3} pb={1} fontSize="xs" fontWeight="bold" color="whiteAlpha.500" textTransform="uppercase" letterSpacing="wider">
+          Visão geral
+        </Text>
+        <NavItem route="/dashboard" icon={FiHome} onClick={onClose}>
+          Início
         </NavItem>
-        <Text fontSize={"sm"} fontWeight={"bold"}>
+        <Text px={3} pt={5} pb={1} fontSize="xs" fontWeight="bold" color="whiteAlpha.500" textTransform="uppercase" letterSpacing="wider">
           Administrar
         </Text>
         {administrar.map((link) => (
-          <NavItem key={link.name} route={link.route} icon={link.icon}>
+          <NavItem key={link.name} route={link.route} icon={link.icon} onClick={onClose}>
             {link.name}
           </NavItem>
         ))}
-        <Text fontSize={"sm"} fontWeight={"bold"}>
+        <Text px={3} pt={5} pb={1} fontSize="xs" fontWeight="bold" color="whiteAlpha.500" textTransform="uppercase" letterSpacing="wider">
           Configurações
         </Text>
         {configuracao.map((link) => (
-          <NavItem key={link.name} route={link.route} icon={link.icon}>
+          <NavItem key={link.name} route={link.route} icon={link.icon} onClick={onClose}>
             {link.name}
           </NavItem>
         ))}
-        <Text fontSize={"sm"} fontWeight={"bold"}>
-          Perfil
-        </Text>
-        <Text fontSize="sm">{customer?.username}</Text>
+      </Stack>
+
+      <Stack px={3} py={6} spacing={2}>
+        <Button
+          as="a"
+          href="https://wa.me/5527995074930?text=Oi%21%20Preciso%20de%20ajuda%20com%20minha%20loja%20na%20KIZI."
+          target="_blank"
+          rel="noreferrer"
+          leftIcon={<FaWhatsapp />}
+          size="sm"
+          variant="outline"
+          borderColor="whiteAlpha.300"
+          color="white"
+          _hover={{ bg: "whiteAlpha.100", borderColor: "whiteAlpha.500" }}
+          justifyContent="flex-start"
+          aria-label="Falar com o suporte humano grátis pelo WhatsApp"
+        >
+          Suporte grátis
+        </Button>
         {storeUrl && (
           <Button
             as="a"
@@ -181,39 +203,78 @@ const SidebarContent = ({ onClose, ...rest }) => {
             leftIcon={<FiExternalLink />}
             size="sm"
             variant="outline"
-            borderColor="whiteAlpha.500"
+            borderColor="whiteAlpha.300"
             color="white"
-            _hover={{ bg: "whiteAlpha.200" }}
+            _hover={{ bg: "whiteAlpha.100" }}
             justifyContent="flex-start"
           >
             Ver loja
           </Button>
         )}
-        <NavItem onClick={logOut} icon={FiLogOut}>
-          Deslogar
-        </NavItem>
+          <HStack
+          borderTop="1px solid"
+          borderColor="whiteAlpha.200"
+          pt={4}
+          spacing={3}
+        >
+          <Link as={RouterLink} to="/dashboard/profile" flex="1" minW={0} _hover={{ textDecoration: "none" }}>
+            <HStack spacing={3}>
+              <Avatar name={customer?.username || "Lojista"} size="sm" bg="brand.600" color="white" />
+              <Box minW={0}>
+                <Text fontSize="sm" fontWeight="semibold" noOfLines={1} color="white">{customer?.username || "Sua conta"}</Text>
+                <Text fontSize="xs" color="whiteAlpha.600">Meu perfil</Text>
+              </Box>
+            </HStack>
+          </Link>
+          <IconButton
+            aria-label="Sair da conta"
+            icon={<FiLogOut />}
+            onClick={logOut}
+            size="sm"
+            variant="ghost"
+            color="whiteAlpha.700"
+            _hover={{ bg: "whiteAlpha.100", color: "white" }}
+          />
+        </HStack>
       </Stack>
-      <Stack> </Stack>
     </Stack>
   );
 };
 
 const NavItem = ({ icon, route, children, ...rest }) => {
+  const { pathname } = useLocation();
+  const isActive = route === pathname;
   const content = (
     <Flex
       align="center"
-      borderRadius="lg"
-      role="group"
+      borderRadius="xl"
+      px={3}
+      py={2.5}
+      minH="44px"
+      fontSize="sm"
+      fontWeight={isActive ? "semibold" : "medium"}
+      color={isActive ? "white" : "whiteAlpha.800"}
+      bg={isActive ? "brand.600" : "transparent"}
       cursor="pointer"
+      transition="all 160ms ease"
+      _hover={{
+        bg: isActive ? "brand.600" : "whiteAlpha.100",
+        color: "white",
+      }}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "brand.300",
+        outlineOffset: "2px",
+      }}
+      as={route ? "div" : "button"}
+      type={route ? undefined : "button"}
       {...rest}
     >
       {icon && (
         <Icon
           mr="3"
-          fontSize="16"
-          _groupHover={{
-            color: "white",
-          }}
+          fontSize="17px"
+          color={isActive ? "white" : "whiteAlpha.600"}
           as={icon}
         />
       )}
@@ -227,9 +288,11 @@ const NavItem = ({ icon, route, children, ...rest }) => {
 
   return (
     <Link
-      href={route}
+      as={RouterLink}
+      to={route}
+      aria-current={isActive ? "page" : undefined}
       style={{ textDecoration: "none" }}
-      _focus={{ boxShadow: "none" }}
+      _focusVisible={{ boxShadow: "outline", borderRadius: "xl" }}
     >
       {content}
     </Link>
@@ -241,65 +304,37 @@ const MobileNav = ({ onOpen, ...rest }) => {
   return (
     <Flex
       ml={{ base: 0, md: 0 }}
-      px={{ base: 4, md: 4 }}
-      height="20"
+      px={4}
+      height="16"
       alignItems="center"
       display={isDesktop ? "none" : "flex"}
       justifyItems={"center"}
-      backgroundColor={"#5f5482"}
-      textColor={"white"}
-      position={"fixed"}
-      flex={"auto"}
-      width={{ base: "full", md: "full" }}
-      zIndex={"50"}
-      borderBottomWidth="1px"
-      borderBottomColor={"#5f5482"}
-      justifyContent={{ base: "center", md: "center" }}
+      backgroundColor="#082f1e"
+      color="white"
+      position="fixed"
+      width="full"
+      zIndex="50"
+      borderBottom="1px solid"
+      borderBottomColor="#103d2b"
+      justifyContent="space-between"
       {...rest}
     >
-      <HStack zIndex={"50"} justifyContent={"center"} width={"full"}>
-        <Flex
-          display={"flex"}
-          alignItems={"center"}
-          zIndex={"50"}
-          justifyContent={"end"}
-          width={"full"}
-        >
-          <Menu
-            zIndex={"50"}
-            width={"full"}
-            alignItems={"center"}
-            justifyContent={"end"}
-          >
-            <Flex
-              justifyContent={"start"}
-              gap={4}
-              alignSelf={"center"}
-              rounded={"md"}
-              backgroundColor={"#5F5482"}
-              textColor={"white"}
-              w={{ base: "full", md: "full" }}
-              h="35px"
-            >
-              <Image
-                src="/icon_sem_fundo.png"
-                alt="Logo"
-                boxSize="35px"
-                objectFit="contain"
-                alignSelf="center"
-              />
-              <Text alignSelf={"center"}>Mostra Digital</Text>
-            </Flex>
-            <IconButton
-              display={isDesktop ? "none" : "flex"}
-              onClick={onOpen}
-              variant="outline"
-              aria-label="open menu"
-              icon={<FiMenu />}
-            />
-          </Menu>
-        </Flex>
+      <HStack spacing={3}>
+        <Image
+          src="/brand-mark-dark.png"
+          alt="KIZI"
+          boxSize="34px"
+          objectFit="contain"
+        />
       </HStack>
+      <IconButton
+        onClick={onOpen}
+        variant="ghost"
+        color="white"
+        _hover={{ bg: "whiteAlpha.100" }}
+        aria-label="Abrir menu"
+        icon={<FiMenu />}
+      />
     </Flex>
   );
 };

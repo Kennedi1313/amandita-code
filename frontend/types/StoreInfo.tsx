@@ -6,20 +6,36 @@ export interface Category {
 
 export interface StoreInfo {
   id: number;
+  plan?: "FREE" | "COMPLETE";
   name: string;
   domain: string;
   logoUrl: string;
+  headerBackgroundColor?: string;
   bannerUrl: string;
+  bannerMobileUrl?: string;
   iconUrl: string;
-  mercadoPagoPublicKey: string;
+  asaasConfigured?: boolean;
+  mercadoPagoConfigured?: boolean;
+  checkoutEnabled?: boolean;
+  mercadoPagoPublicKey?: string;
+  melhorEnvioConfigured?: boolean;
   instagram: string;
   whatsapp: string;
   pickupEnabled?: boolean;
+  pickupAddress?: {
+    zip?: string;
+    street?: string;
+    number?: string;
+    district?: string;
+    city?: string;
+    reference?: string;
+  } | null;
   localDeliveryEnabled?: boolean;
   localDeliveryFee?: number;
   freeShippingMinAmount?: number;
   shippingOriginZip?: string;
   localDeliveryEta?: string;
+  deliveryDistanceRanges?: Array<{ maxDistanceKm: number; fee: number }>;
   createdAt: string;
   updatedAt: string;
   categories: Category[];

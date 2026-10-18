@@ -19,6 +19,14 @@ public record SaleResponse(
         String paymentId,
         String status,
         Boolean shipment,
+        String shippingMethod,
+        Integer shippingFee,
+        String shippingZip,
+        String shippingQuote,
+        String melhorEnvioShipmentId,
+        String melhorEnvioTrackingCode,
+        String melhorEnvioLabelUrl,
+        String melhorEnvioStatus,
         Long storeId,
         List<SaleItemDTO> items
 ) {
@@ -36,6 +44,14 @@ public record SaleResponse(
                 sale.getPaymentId(),
                 sale.getStatus(),
                 sale.getShipment(),
+                sale.getShippingMethod(),
+                sale.getShippingFee(),
+                sale.getShippingZip(),
+                sale.getShippingQuote(),
+                sale.getMelhorEnvioShipmentId(),
+                sale.getMelhorEnvioTrackingCode(),
+                sale.getMelhorEnvioLabelUrl(),
+                sale.getMelhorEnvioStatus(),
                 sale.getStore() != null ? sale.getStore().getId() : null,
 
                 sale.getSaleItems() != null

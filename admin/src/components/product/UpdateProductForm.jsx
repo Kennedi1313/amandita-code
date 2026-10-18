@@ -6,6 +6,7 @@ import {
   FormLabel,
   Stack,
   Textarea,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import {
@@ -135,6 +136,10 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
           category: updatedProduct.category,
           imagesToDelete: imagesToDelete,
           variations: finalVariations,
+          weightKg: updatedProduct.weightKg || null,
+          widthCm: updatedProduct.widthCm || null,
+          heightCm: updatedProduct.heightCm || null,
+          lengthCm: updatedProduct.lengthCm || null,
         };
 
         const formData = new FormData();
@@ -195,8 +200,8 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
             <MyTextInput
               label="Nome"
               name="name"
-              borderColor="#ebe5fc"
-              focusBorderColor="#5f5482"
+              borderColor="#e4f2d5"
+              focusBorderColor="#1f633c"
               type="text"
             />
 
@@ -205,8 +210,8 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
               <Textarea
                 id="description"
                 name="description"
-                borderColor="#ebe5fc"
-                focusBorderColor="#5f5482"
+                borderColor="#e4f2d5"
+                focusBorderColor="#1f633c"
                 value={formik.values.description}
                 onChange={(e) =>
                   formik.setFieldValue("description", e.target.value)
@@ -218,8 +223,8 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
               label="Categoria"
               name="category"
               marginBottom={"3rem"}
-              borderColor="#ebe5fc"
-              focusBorderColor="#5f5482"
+              borderColor="#e4f2d5"
+              focusBorderColor="#1f633c"
             >
               <option disabled value="">
                 (Selecione uma categoria)
@@ -241,8 +246,8 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
               <MySelectInput
                 label="Tipo de produto"
                 name="productType"
-                borderColor="#ebe5fc"
-                focusBorderColor="#5f5482"
+                borderColor="#e4f2d5"
+                focusBorderColor="#1f633c"
                 mb={5}
                 value={productType}
                 onChange={(e) => {
@@ -290,9 +295,22 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
             </Stack>
           </Stack>
 
+          <Stack p={4} border="1px solid #eee" borderRadius="md">
+            <FormLabel mb={0}>Dimensões e peso para cálculo de frete</FormLabel>
+            <Text fontSize="sm" color="gray.500">Informe o produto embalado. Usado pelo Melhor Envio.</Text>
+            <Text fontSize="sm" color="orange.700" mt={2}>
+              Informe medidas e peso reais da embalagem. Divergências podem gerar cobranças adicionais diretamente na conta do Melhor Envio.
+            </Text>
+            <Stack direction={{ base: "column", md: "row" }}>
+              <MyTextInput label="Peso (kg)" name="weightKg" type="number" step="0.001" placeholder="Ex.: 0,500" />
+              <MyTextInput label="Largura (cm)" name="widthCm" type="number" placeholder="Ex.: 20" />
+              <MyTextInput label="Altura (cm)" name="heightCm" type="number" placeholder="Ex.: 10" />
+              <MyTextInput label="Comprimento (cm)" name="lengthCm" type="number" placeholder="Ex.: 30" />
+            </Stack>
+          </Stack>
+
           <Button
-            backgroundColor="#5f5482"
-            color="white"
+            colorScheme="brand"
             marginTop="3rem"
             padding="1.5rem"
             type="submit"

@@ -1,68 +1,119 @@
 import Item from "../components/item";
-import Head from "next/head";
 import Image from "next/image";
 import { HomeProps, Product } from "@/types/ProductTypes";
-import {
-  getProductsPaginated,
-  getProductsPaginatedNoStore,
-} from "@/lib/productClient";
+import { getProductsPaginated } from "@/lib/productClient";
 import useStoreInfo from "@/hooks/use-store-info";
 import { useEffect, useState } from "react";
+import { FiRefreshCw } from "react-icons/fi";
 
 export default function Home({ products, itemsCount }: HomeProps) {
   const [productList, setProductList] = useState<Product[]>(products);
   const [productListSize, setProductListSize] = useState<number>(itemsCount);
   const [hasMounted, setHasMounted] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const fetchProducts = async () => {
+    setHasMounted(false);
+    setLoadError(false);
     try {
       const data = await getProductsPaginated(0, "");
       setProductList(data.content);
       setProductListSize(data.totalElements);
+    } catch (error) {
+      console.error("Não foi possível carregar os produtos da loja.", error);
+      setLoadError(true);
+    } finally {
       setHasMounted(true);
-    } catch (error) {}
+    }
   };
   useEffect(() => {
     fetchProducts();
   }, []);
   const storeInfo = useStoreInfo();
-  if (!storeInfo || !hasMounted) return null;
+  if (!storeInfo) return null;
   const hasUploadedBanner = storeInfo.bannerUrl.match(/^https?:\/\//i);
   const desktopBannerSrc = hasUploadedBanner
     ? storeInfo.bannerUrl
     : "/" + storeInfo.bannerUrl + ".png";
-  const mobileBannerSrc = hasUploadedBanner
+  const mobileBannerSrc = storeInfo.bannerMobileUrl || (hasUploadedBanner
     ? storeInfo.bannerUrl
-    : "/" + storeInfo.bannerUrl + "_mobile.png";
+    : "/" + storeInfo.bannerUrl + "_mobile.png");
   return (
-    <>
-      {productListSize > 0 ? (
-        <div>
-          <div className="relative mt-20 md:mt-[8.5rem] gray-50">
-            <div className="block md:hidden">
-              <Image
-                src={mobileBannerSrc}
-                alt="Banner Mobile"
-                width={768}
-                height={400}
-                className="w-full h-auto object-cover"
-              />
-            </div>
-            <div className="hidden md:block max-w-screen-lg w-full m-auto">
-              <Image
-                src={desktopBannerSrc}
-                alt="Banner Desktop"
-                width={768}
-                height={400}
-                className="w-full h-auto object-cover"
-              />
+    <div className="min-h-screen bg-[#fbfaf9] pb-16">
+      <div className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 md:pt-32 lg:px-8">
+        <section
+          aria-label="Apresentação da loja"
+          className="overflow-hidden rounded-2xl bg-[#f3f0ed] shadow-sm ring-1 ring-black/5 sm:rounded-b-3xl"
+        >
+          <div className="relative aspect-square w-full sm:aspect-[2.15/1]">
+            <Image
+              src={desktopBannerSrc}
+              alt={`Vitrine da loja ${storeInfo.name}`}
+              fill
+              priority
+              sizes="(max-width: 640px) 100vw, 1280px"
+              className="hidden object-cover sm:block"
+            />
+            <Image
+              src={mobileBannerSrc}
+              alt={`Vitrine da loja ${storeInfo.name}`}
+              fill
+              priority
+              sizes="100vw"
+              className="object-cover sm:hidden"
+            />
+          </div>
+        </section>
+
+        <section id="novidades" className="scroll-mt-28 py-12 sm:py-16">
+          <div className="mb-7 flex flex-wrap items-end justify-between gap-4 sm:mb-9">
+            <div>
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.16em] text-gray-500">
+                Escolhas da loja
+              </p>
+              <h1 className="text-3xl font-semibold tracking-tight text-gray-950 sm:text-4xl">
+                Novidades
+              </h1>
+              <p className="mt-2 max-w-xl text-sm leading-6 text-gray-600 sm:text-base">
+                Descubra os produtos que chegaram para você.
+              </p>
             </div>
           </div>
 
-          <div className="z-10 mx-full flex flex-col items-center align-middle justify-center px-2 md:px-0 py-5 my-2 relative">
-            <h1 className="pb-5 text-4xl mt-8 w-full md:text-center">
-              Novidades
-            </h1>
-            <div className="z-30 md:max-w-screen-lg mx-auto center grid lg:grid-cols-4 grid-cols-2 w-full gap-2 gap-y-4">
+          {!hasMounted ? (
+            <div
+              className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4"
+              aria-label="Carregando produtos"
+              aria-busy="true"
+            >
+              {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="animate-pulse">
+                  <div className="aspect-square rounded-2xl bg-gray-200" />
+                  <div className="mt-4 h-4 w-3/4 rounded bg-gray-200" />
+                  <div className="mt-2 h-4 w-1/3 rounded bg-gray-200" />
+                </div>
+              ))}
+            </div>
+          ) : loadError ? (
+            <div
+              role="alert"
+              className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center shadow-sm"
+            >
+              <p className="text-lg font-semibold text-gray-900">
+                Não foi possível carregar os produtos
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                Verifique sua conexão e tente novamente.
+              </p>
+              <button
+                type="button"
+                onClick={fetchProducts}
+                className="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-gray-950 px-5 text-sm font-semibold text-white transition hover:bg-gray-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+              >
+                <FiRefreshCw aria-hidden="true" /> Tentar novamente
+              </button>
+            </div>
+          ) : productListSize > 0 ? (
+            <div className="grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-4">
               {productList.map((item) => (
                 <Item
                   key={item.id}
@@ -77,18 +128,25 @@ export default function Home({ products, itemsCount }: HomeProps) {
                 />
               ))}
             </div>
-          </div>
-        </div>
-      ) : (
-        <h1>NENHUM PRODUTO CADASTRADO</h1>
-      )}
-    </>
+          ) : (
+            <div className="rounded-2xl border border-gray-200 bg-white px-6 py-14 text-center shadow-sm">
+              <p className="text-lg font-semibold text-gray-900">
+                Novidades em breve
+              </p>
+              <p className="mt-2 text-sm text-gray-600">
+                Estamos preparando os produtos desta vitrine. Volte em breve
+                para conferir.
+              </p>
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }
 
 export const getStaticProps = async () => {
   try {
-    //const data = await getProductsPaginatedNoStore(0, "");
     return { props: { products: [], itemsCount: 0 } };
   } catch (error) {
     return { props: { products: [], itemsCount: 0 } };

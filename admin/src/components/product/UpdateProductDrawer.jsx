@@ -21,7 +21,7 @@ const UpdateProductDrawer = ({
   return (
     <>
       <Button
-        colorScheme="blue"
+        colorScheme="brand"
         width={"full"}
         rounded={"md"}
         leftIcon={<FiEdit />}

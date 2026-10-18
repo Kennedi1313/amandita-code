@@ -117,7 +117,7 @@ const CreateCustomerForm = ({ onSuccess }) => {
 
               <Button
                 disabled={!isValid || isSubmitting}
-                color={"#5f5482"}
+                color={"#1f633c"}
                 type="submit"
               >
                 Cadastrar

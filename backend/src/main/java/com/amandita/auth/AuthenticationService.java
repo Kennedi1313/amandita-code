@@ -21,6 +21,7 @@ public class AuthenticationService {
     private final RoleService roleService;
     private final StoreDao storeDao;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final CustomerService customerService;
 
     public AuthenticationService(PasswordEncoder passwordEncoder,
                                  CustomerDTOMapper customerDTOMapper,
@@ -29,7 +30,8 @@ public class AuthenticationService {
                                  CustomerStoreRoleRepository customerStoreRoleRepository,
                                  RoleService roleService,
                                  StoreDao storeDao,
-                                 GoogleTokenVerifier googleTokenVerifier) {
+                                 GoogleTokenVerifier googleTokenVerifier,
+                                 CustomerService customerService) {
         this.passwordEncoder = passwordEncoder;
         this.customerDTOMapper = customerDTOMapper;
         this.jwtUtil = jwtUtil;
@@ -38,6 +40,7 @@ public class AuthenticationService {
         this.roleService = roleService;
         this.storeDao = storeDao;
         this.googleTokenVerifier = googleTokenVerifier;
+        this.customerService = customerService;
     }
 
     public AuthenticationResponse login(AuthenticationRequest request, Long storeId) {
@@ -56,11 +59,8 @@ public class AuthenticationService {
     }
 
     public AuthenticationResponse adminLogin(AuthenticationRequest request) {
-        CustomerStoreRole membership = customerStoreRoleRepository.findMembershipsByEmailAndRole(request.username(), "ROLE_ADMIN")
-                .stream()
-                .findFirst()
-                .orElseThrow(() -> new UsernameNotFoundException("Admin user not found"));
-        Customer user = membership.getCustomer();
+        CustomerStoreRole membership = findAdminMembership(request.username());
+        Customer user = findAdminCustomer(request.username(), membership);
 
         if (StringUtils.isBlank(user.getPassword())) {
             throw new BadCredentialsException("Entre com Google para acessar esta conta.");
@@ -69,25 +69,52 @@ public class AuthenticationService {
             throw new BadCredentialsException("Invalid password");
         }
 
-        Store adminStore = membership.getStore();
-        user.setEffectiveRoles(customerStoreRoleRepository.findRolesByCustomerAndStore(user.getId(), adminStore.getId()));
-        CustomerDTO customerDTO = customerDTOMapper.apply(user);
-        String token = jwtUtil.issueToken(customerDTO.username(), customerDTO.roles(), adminStore.getId());
-        return new AuthenticationResponse(token, customerDTO);
+        return createAdminAuthentication(user, membership);
     }
 
     public AuthenticationResponse adminLoginWithGoogle(GoogleLoginRequest request) {
         GoogleTokenInfo tokenInfo = googleTokenVerifier.verify(request.credential());
-        CustomerStoreRole membership = customerStoreRoleRepository.findMembershipsByEmailAndRole(tokenInfo.email(), "ROLE_ADMIN")
+        CustomerStoreRole membership = findAdminMembership(tokenInfo.email());
+        Customer user = findAdminCustomer(tokenInfo.email(), membership);
+        if (StringUtils.isBlank(user.getProfileImageId()) && StringUtils.isNotBlank(tokenInfo.picture())) {
+            customerService.importGoogleProfileImage(user.getId(), tokenInfo.picture());
+        }
+        return createAdminAuthentication(user, membership);
+    }
+
+    private CustomerStoreRole findAdminMembership(String email) {
+        return customerStoreRoleRepository.findMembershipsByEmailAndRole(
+                        StringUtils.trimToEmpty(email),
+                        "ROLE_ADMIN")
                 .stream()
                 .findFirst()
-                .orElseThrow(() -> new UsernameNotFoundException("Admin user not found"));
-        Customer user = membership.getCustomer();
+                .orElse(null);
+    }
 
-        Store adminStore = membership.getStore();
-        user.setEffectiveRoles(customerStoreRoleRepository.findRolesByCustomerAndStore(user.getId(), adminStore.getId()));
+    private Customer findAdminCustomer(String email, CustomerStoreRole membership) {
+        if (membership != null) {
+            return membership.getCustomer();
+        }
+
+        return customerRepository.findLegacyAdminByEmail(StringUtils.trimToEmpty(email))
+                .orElseThrow(() -> new UsernameNotFoundException("Admin user not found"));
+    }
+
+    private AuthenticationResponse createAdminAuthentication(Customer user, CustomerStoreRole membership) {
+        Store adminStore = membership != null
+                ? membership.getStore()
+                : user.getOwnedStore() != null
+                        ? user.getOwnedStore()
+                        : user.getStore();
+        if (membership != null) {
+            user.setEffectiveRoles(
+                    customerStoreRoleRepository.findRolesByCustomerAndStore(user.getId(), adminStore.getId()));
+        }
         CustomerDTO customerDTO = customerDTOMapper.apply(user);
-        String token = jwtUtil.issueToken(customerDTO.username(), customerDTO.roles(), adminStore.getId());
+        String token = jwtUtil.issueToken(
+                customerDTO.username(),
+                customerDTO.roles(),
+                adminStore == null ? null : adminStore.getId());
         return new AuthenticationResponse(token, customerDTO);
     }
 
@@ -95,6 +122,10 @@ public class AuthenticationService {
         GoogleTokenInfo tokenInfo = googleTokenVerifier.verify(request.credential());
         Customer user = customerStoreRoleRepository.findCustomerByEmailStoreAndRole(tokenInfo.email(), storeId, "ROLE_USER")
                 .orElseGet(() -> createGoogleCustomer(tokenInfo, storeId));
+
+        if (StringUtils.isBlank(user.getProfileImageId()) && StringUtils.isNotBlank(tokenInfo.picture())) {
+            customerService.importGoogleProfileImage(user.getId(), tokenInfo.picture());
+        }
 
         user.setEffectiveRoles(customerStoreRoleRepository.findRolesByCustomerAndStore(user.getId(), storeId));
         CustomerDTO customerDTO = customerDTOMapper.apply(user);

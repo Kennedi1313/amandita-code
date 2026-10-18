@@ -28,6 +28,9 @@ public class ProductVariation {
     @Column(name = "created_at")
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "display_order")
+    private Integer displayOrder = 0;
+
     @Type(JsonBinaryType.class)
     @Column(columnDefinition = "jsonb")
     private Map<String, String> options;
@@ -78,6 +81,14 @@ public class ProductVariation {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Integer getDisplayOrder() {
+        return displayOrder;
+    }
+
+    public void setDisplayOrder(Integer displayOrder) {
+        this.displayOrder = displayOrder;
     }
 
     public Integer getPromo() {

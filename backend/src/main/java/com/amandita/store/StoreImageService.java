@@ -31,6 +31,7 @@ public class StoreImageService {
         switch (normalizeType(type)) {
             case "logo" -> store.setLogoUrl(imageUrl);
             case "banner" -> store.setBannerUrl(imageUrl);
+            case "banner-mobile" -> store.setBannerMobileUrl(imageUrl);
             case "icon" -> store.setIconUrl(imageUrl);
             default -> throw new IllegalArgumentException("Tipo de imagem invalido");
         }
@@ -48,12 +49,11 @@ public class StoreImageService {
     private void putImage(Long storeId, String type, MultipartFile file) {
         try {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            int maxSize = "banner".equals(type) ? 1600 : 600;
+            int maxSize = type.startsWith("banner") ? 1600 : 600;
 
             Thumbnails.of(file.getInputStream())
                     .size(maxSize, maxSize)
-                    .outputFormat("jpg")
-                    .outputQuality(0.85)
+                    .outputFormat("png")
                     .toOutputStream(outputStream);
 
             s3Service.putObject(
@@ -67,7 +67,7 @@ public class StoreImageService {
     }
 
     private String imageKey(Long storeId, String type) {
-        return "store-images/%s/%s.jpg".formatted(storeId, type);
+        return "store-images/%s/%s.png".formatted(storeId, type);
     }
 
     private String normalizeType(String type) {
@@ -76,7 +76,8 @@ public class StoreImageService {
         }
 
         String normalized = type.trim().toLowerCase();
-        if (!normalized.equals("logo") && !normalized.equals("banner") && !normalized.equals("icon")) {
+        if (!normalized.equals("logo") && !normalized.equals("banner")
+                && !normalized.equals("banner-mobile") && !normalized.equals("icon")) {
             throw new IllegalArgumentException("Tipo de imagem invalido");
         }
         return normalized;

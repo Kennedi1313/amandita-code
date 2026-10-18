@@ -50,17 +50,7 @@ public class CheckoutProController {
     public ResponseEntity<?> createAsaasCheckout(@RequestBody AsaasCheckoutRequest request,
                                                  HttpServletRequest httpRequest,
                                                  Authentication authentication) {
-        try {
-            return ResponseEntity.ok(asaasCheckoutService.createCheckout(
-                    request,
-                    (Long) httpRequest.getAttribute("storeId"),
-                    authenticatedEmail(authentication)
-            ));
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.status(400).body(e.getMessage());
-        } catch (Exception e) {
-            return ResponseEntity.status(502).body(e.getMessage());
-        }
+        return ResponseEntity.status(HttpStatus.GONE).body("Asaas não está disponível nesta versão.");
     }
 
     @PostMapping("/asaas/webhook")

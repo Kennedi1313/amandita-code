@@ -10,13 +10,14 @@ import {
   Stack,
   Text,
 } from "@chakra-ui/react";
-import { FiPlus, FiTag, FiTrash } from "react-icons/fi";
+import { FiCheck, FiEdit2, FiPlus, FiTag, FiTrash, FiX } from "react-icons/fi";
 import SidebarWithHeader from "./components/shared/SideBar.jsx";
 import PageHeader from "./components/shared/PageHeader.jsx";
 import {
   createCategory,
   deleteCategory,
   getCategories,
+  updateCategory,
 } from "./services/client.js";
 import {
   errorNotification,
@@ -27,6 +28,8 @@ const Categories = () => {
   const [categories, setCategories] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState("");
 
   const fetchCategories = async () => {
     try {
@@ -78,6 +81,21 @@ const Categories = () => {
     }
   };
 
+  const handleUpdateCategory = async (categoryId) => {
+    if (!editingName.trim()) return;
+    try {
+      const response = await updateCategory(categoryId, editingName.trim());
+      setCategories((current) => current.map((category) =>
+        category.id === categoryId ? response.data : category,
+      ));
+      setEditingId(null);
+      setEditingName("");
+      successNotification("Categoria atualizada", "Os produtos também foram atualizados.");
+    } catch (err) {
+      errorNotification(err.code || "Erro", err.response?.data?.message || "Falha ao atualizar categoria");
+    }
+  };
+
   if (loading) {
     return (
       <SidebarWithHeader>
@@ -85,7 +103,7 @@ const Categories = () => {
           thickness="4px"
           speed="0.65s"
           emptyColor="gray.200"
-          color="#5f5482"
+          color="#1f633c"
           size="xl"
         />
       </SidebarWithHeader>
@@ -94,7 +112,7 @@ const Categories = () => {
 
   return (
     <SidebarWithHeader>
-      <Box maxW="7xl" mx="auto" px={{ base: 2, md: 6 }} py={{ base: 4, md: 8 }}>
+      <Box maxW="7xl" mx="auto" px={{ base: 0, md: 6 }} py={{ base: 3, md: 8 }}>
         <Stack spacing={6}>
           <PageHeader
             title="Categorias"
@@ -106,7 +124,7 @@ const Categories = () => {
             borderColor="gray.100"
             borderRadius="lg"
             bg="white"
-            p={{ base: 4, md: 5 }}
+            p={{ base: 3, md: 5 }}
           >
             <Stack spacing={4}>
               <SimpleGrid columns={{ base: 1, md: "1fr auto" }} spacing={3}>
@@ -114,12 +132,11 @@ const Categories = () => {
                   value={newCategoryName}
                   placeholder="Nome da nova categoria"
                   onChange={(event) => setNewCategoryName(event.target.value)}
-                  focusBorderColor="#5f5482"
+                  focusBorderColor="#1f633c"
                 />
                 <Button
                   leftIcon={<FiPlus />}
-                  backgroundColor="#5f5482"
-                  color="white"
+                  colorScheme="brand"
                   onClick={handleAddCategory}
                 >
                   Adicionar
@@ -141,7 +158,7 @@ const Categories = () => {
                 p={8}
                 textAlign="center"
               >
-                <Icon as={FiTag} boxSize={8} color="#5f5482" />
+                <Icon as={FiTag} boxSize={8} color="#1f633c" />
                 <Text mt={3} fontWeight="bold">
                   Nenhuma categoria cadastrada
                 </Text>
@@ -166,9 +183,18 @@ const Categories = () => {
                 bg="white"
                 p={2}
               >
-                <Text fontWeight="semibold" px={2} noOfLines={1}>
-                  {category.name}
-                </Text>
+                {editingId === category.id ? (
+                  <Input
+                    size="sm"
+                    value={editingName}
+                    onChange={(event) => setEditingName(event.target.value)}
+                    autoFocus
+                  />
+                ) : (
+                  <Text fontWeight="semibold" px={2} noOfLines={1}>
+                    {category.name}
+                  </Text>
+                )}
                 <Text
                   color="gray.500"
                   fontSize="sm"
@@ -178,15 +204,53 @@ const Categories = () => {
                   {category.path}
                 </Text>
                 <Stack
-                  direction="row"
+                  direction={{ base: "column", sm: "row" }}
                   justify={{ base: "stretch", md: "end" }}
                   spacing={1}
                 >
+                  {editingId === category.id ? (
+                    <>
+                      <Button
+                        size="sm"
+                        colorScheme="green"
+                        variant="ghost"
+                        leftIcon={<FiCheck />}
+                        onClick={() => handleUpdateCategory(category.id)}
+                      >
+                        Salvar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        leftIcon={<FiX />}
+                        onClick={() => {
+                          setEditingId(null);
+                          setEditingName("");
+                        }}
+                      >
+                        Cancelar
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      size="sm"
+                      colorScheme="brand"
+                      variant="ghost"
+                      leftIcon={<FiEdit2 />}
+                      onClick={() => {
+                        setEditingId(category.id);
+                        setEditingName(category.name);
+                      }}
+                    >
+                      Editar
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     colorScheme="red"
                     variant="ghost"
                     leftIcon={<FiTrash />}
+                    isDisabled={editingId === category.id}
                     onClick={() => handleDeleteCategory(category.id)}
                   >
                     Remover

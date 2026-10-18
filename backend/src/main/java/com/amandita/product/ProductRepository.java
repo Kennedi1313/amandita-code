@@ -17,24 +17,30 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     @Modifying(clearAutomatically = true)
     @Query("UPDATE Product p SET p.profileImageId = ?1 WHERE p.id = ?2")
     void updateProfileImageId(String profileImageId, Integer productId);
-    @Query("select p from Product p JOIN p.store s WHERE s.id = ?1")
+    @Query("select p from Product p JOIN p.store s WHERE s.id = ?1 AND p.active = true")
     Page<Product> findAllByStore(Long storeId, Pageable pageable);
+    Page<Product> findByStoreIdAndActiveTrueAndPublishedTrue(Long storeId, Pageable pageable);
+    Page<Product> findAllByActiveTrue(Pageable pageable);
+    Optional<Product> findByIdAndStoreIdAndActiveTrue(Integer id, Long storeId);
+    Optional<Product> findByIdAndStoreIdAndActiveTrueAndPublishedTrue(Integer id, Long storeId);
+    Optional<Product> findByIdAndActiveTrue(Integer id);
     Optional<Product> findByIdAndStoreId(Integer id, Long storeId);
-    Page<Product> findByStoreIdAndCategory(Long storeId, String category, Pageable pageable);
+    Page<Product> findByStoreIdAndCategoryAndActiveTrue(Long storeId, String category, Pageable pageable);
+    Page<Product> findByStoreIdAndCategoryAndActiveTrueAndPublishedTrue(Long storeId, String category, Pageable pageable);
     boolean existsByStoreIdAndCategory(Long storeId, String category);
-    Page<Product> findByCategory(String category, Pageable pageable);
-    Page<Product> findByCategoryAndNameContaining(String category, String name, Pageable pageable);
-    Page<Product> findByStoreIdAndNameContainingIgnoreCase(Long storeId, String name, Pageable pageable);
-    Page<Product> findByNameContainingIgnoreCase(String name, Pageable pageable);
+    Page<Product> findByCategoryAndActiveTrue(String category, Pageable pageable);
+    Page<Product> findByCategoryAndNameContainingAndActiveTrue(String category, String name, Pageable pageable);
+    Page<Product> findByStoreIdAndNameContainingIgnoreCaseAndActiveTrue(Long storeId, String name, Pageable pageable);
+    Page<Product> findByStoreIdAndNameContainingIgnoreCaseAndActiveTrueAndPublishedTrue(Long storeId, String name, Pageable pageable);
+    Page<Product> findByNameContainingIgnoreCaseAndActiveTrue(String name, Pageable pageable);
+    long countByStoreIdAndActiveTrueAndPublishedTrue(Long storeId);
 
-    @Query("SELECT CASE WHEN COUNT(si) > 0 THEN true ELSE false END FROM SaleItem si WHERE si.product.id = :productId")
-    boolean existsSaleItemByProductId(@Param("productId") Integer productId);
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Product p SET p.published = false WHERE p.store.id = :storeId")
+    void unpublishAllByStoreId(@Param("storeId") Long storeId);
 
     @Query("SELECT CASE WHEN COUNT(si) > 0 THEN true ELSE false END FROM SaleItem si WHERE si.variation.id = :variationId")
     boolean existsSaleItemByVariationId(@Param("variationId") Integer variationId);
-
-    @Query("SELECT CASE WHEN COUNT(h) > 0 THEN true ELSE false END FROM History h WHERE h.product.id = :productId")
-    boolean existsHistoryByProductId(@Param("productId") Integer productId);
 
     @Modifying(clearAutomatically = true)
     @Transactional

@@ -9,6 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { FiPlus, FiTrash } from "react-icons/fi";
+import { useEffect, useRef, useState } from "react";
 import PriceInput from "./PriceInput.jsx";
 
 const getVariationLabel = (variation = {}) => {
@@ -28,47 +29,39 @@ const normalizeVariation = (variation = {}) => ({
   promo: variation.promo || 0,
 });
 
-export const sortSimpleVariations = (variations = []) =>
-  [...variations].sort((first, second) => {
-    const firstLabel = getVariationLabel(first).trim();
-    const secondLabel = getVariationLabel(second).trim();
-
-    if (!firstLabel && !secondLabel) return 0;
-    if (!firstLabel) return 1;
-    if (!secondLabel) return -1;
-
-    return firstLabel.localeCompare(secondLabel, "pt-BR", {
-      sensitivity: "base",
-      numeric: true,
-    });
-  });
-
 const ProductVariationEditor = ({ value = [], onChange }) => {
-  const rows = sortSimpleVariations(
-    value.map((variation, originalIndex) => ({
-      ...normalizeVariation(variation),
-      originalIndex,
-    })),
-  );
+  // Editing must be isolated from the order returned by Formik/API. The API
+  // stores variations in a Set, so its iteration order is not an editing
+  // order. Keeping a local draft prevents a parent re-render from moving or
+  // remounting the input while the user is typing.
+  const [draftRows, setDraftRows] = useState(() => value.map(normalizeVariation));
+  const hydratedFromParent = useRef(value.length > 0);
+
+  useEffect(() => {
+    if (!hydratedFromParent.current && value.length > 0) {
+      setDraftRows(value.map(normalizeVariation));
+      hydratedFromParent.current = true;
+    }
+  }, [value]);
+
+  const rows = draftRows;
 
   const updateRow = (index, patch) => {
-    const rowToUpdate = rows[index];
-    onChange(
-      value.map((row, rowIndex) =>
-        rowIndex === rowToUpdate.originalIndex ? { ...row, ...patch } : row,
-      ),
+    const nextRows = rows.map((row, rowIndex) =>
+      rowIndex === index ? { ...row, ...patch } : row,
     );
+    setDraftRows(nextRows);
+    onChange(nextRows);
   };
 
   const removeRow = (index) => {
-    const rowToRemove = rows[index];
-    onChange(
-      value.filter((_, rowIndex) => rowIndex !== rowToRemove.originalIndex),
-    );
+    const nextRows = rows.filter((_, rowIndex) => rowIndex !== index);
+    setDraftRows(nextRows);
+    onChange(nextRows);
   };
 
   const addRow = () => {
-    onChange([
+    const nextRows = [
       ...rows,
       {
         label: "",
@@ -76,7 +69,9 @@ const ProductVariationEditor = ({ value = [], onChange }) => {
         quantity: "0",
         promo: 0,
       },
-    ]);
+    ];
+    setDraftRows(nextRows);
+    onChange(nextRows);
   };
 
   return (
@@ -90,7 +85,7 @@ const ProductVariationEditor = ({ value = [], onChange }) => {
 
       {rows.map((row, index) => (
         <Grid
-          key={index}
+          key={row.id || `editor-row-${index}`}
           templateColumns={{ base: "1fr", md: "1.4fr 1fr .7fr .7fr auto" }}
           gap={3}
           alignItems="end"
@@ -101,8 +96,8 @@ const ProductVariationEditor = ({ value = [], onChange }) => {
             <Input
               value={row.label}
               placeholder="Ex: P, M, Azul, Dourado"
-              borderColor="#ebe5fc"
-              focusBorderColor="#5f5482"
+              borderColor="#e4f2d5"
+              focusBorderColor="#1f633c"
               onChange={(event) => updateRow(index, { label: event.target.value })}
             />
           </GridItem>
@@ -121,8 +116,8 @@ const ProductVariationEditor = ({ value = [], onChange }) => {
               type="number"
               min={0}
               value={row.quantity}
-              borderColor="#ebe5fc"
-              focusBorderColor="#5f5482"
+              borderColor="#e4f2d5"
+              focusBorderColor="#1f633c"
               onChange={(event) => updateRow(index, { quantity: event.target.value })}
             />
           </GridItem>
@@ -134,14 +129,15 @@ const ProductVariationEditor = ({ value = [], onChange }) => {
               min={0}
               max={100}
               value={row.promo}
-              borderColor="#ebe5fc"
-              focusBorderColor="#5f5482"
+              borderColor="#e4f2d5"
+              focusBorderColor="#1f633c"
               onChange={(event) => updateRow(index, { promo: event.target.value })}
             />
           </GridItem>
 
           <GridItem>
             <IconButton
+              type="button"
               aria-label="Remover variação"
               icon={<FiTrash />}
               colorScheme="red"
@@ -152,7 +148,7 @@ const ProductVariationEditor = ({ value = [], onChange }) => {
         </Grid>
       ))}
 
-      <Button leftIcon={<FiPlus />} variant="outline" color="#5f5482" onClick={addRow}>
+      <Button type="button" leftIcon={<FiPlus />} variant="outline" colorScheme="brand" onClick={addRow}>
         Adicionar opção
       </Button>
     </Box>
@@ -160,7 +156,7 @@ const ProductVariationEditor = ({ value = [], onChange }) => {
 };
 
 export const prepareSimpleVariationsForSave = (rows = []) =>
-  sortSimpleVariations(rows)
+  rows
     .map(normalizeVariation)
     .filter((row) => row.label && row.label.trim())
     .map((row) => ({

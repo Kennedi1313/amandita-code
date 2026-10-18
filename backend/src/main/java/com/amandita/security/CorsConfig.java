@@ -7,8 +7,6 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 @Configuration
@@ -29,11 +27,12 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(Collections.singletonList("*")); // Aceita qualquer origem
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS")); // Permite todos os métodos
-        configuration.setAllowedHeaders(Collections.singletonList("*")); // Permite todos os headers
-        configuration.setExposedHeaders(Collections.singletonList("*")); // Expõe todos os headers
-        configuration.setAllowCredentials(true); // Permite envio de cookies e credenciais
+        configuration.setAllowedOriginPatterns(allowedOrigins);
+        configuration.setAllowedMethods(allowedMethods);
+        configuration.setAllowedHeaders(allowedHeaders);
+        configuration.setExposedHeaders(expectedHeaders);
+        // Authentication is sent explicitly as a store-scoped bearer token; never allow ambient cookies.
+        configuration.setAllowCredentials(false);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);

@@ -7,6 +7,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
 
 @Repository
 public class SaleJPADataAccessService implements SaleDao {
@@ -20,6 +21,12 @@ public class SaleJPADataAccessService implements SaleDao {
     public Page<Sale> selectAllSales(int page, int size, Long storeId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         return saleRepository.findAllByStoreId(storeId, pageable);
+    }
+
+    @Override
+    public List<Sale> findPendingMercadoPagoSales(Long storeId) {
+        return saleRepository.findByStore_IdAndPaymentMethodAndStatus(
+                storeId, "MERCADO_PAGO", "PENDENTE");
     }
 
     @Override

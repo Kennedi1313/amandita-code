@@ -54,7 +54,7 @@ const Sales = () => {
 
   const getStatusClassName = (status: string) => {
     const normalizedStatus = status?.toUpperCase();
-    if (normalizedStatus === "APROVADO" || normalizedStatus === "ENTREGUE") {
+    if (normalizedStatus === "APROVADO" || normalizedStatus === "ENVIADO" || normalizedStatus === "ENTREGUE") {
       return "bg-green-100 text-green-800";
     }
     if (normalizedStatus === "RECUSADO" || normalizedStatus === "CANCELADO") {
@@ -70,6 +70,7 @@ const Sales = () => {
     const normalizedStatus = status?.toUpperCase();
     if (normalizedStatus === "APROVADO") return "Pagamento aprovado";
     if (normalizedStatus === "PREPARANDO") return "Em preparo";
+    if (normalizedStatus === "ENVIADO") return "Enviado";
     if (normalizedStatus === "ENTREGUE") return "Entregue";
     if (normalizedStatus === "RECUSADO") return "Pagamento recusado";
     if (normalizedStatus === "CANCELADO") return "Cancelado";
@@ -84,6 +85,9 @@ const Sales = () => {
     if (normalizedStatus === "PREPARANDO") {
       return "Seu pedido esta sendo separado pela loja.";
     }
+    if (normalizedStatus === "ENVIADO") {
+      return "Seu pedido foi enviado. Quando houver código de rastreio, ele aparecerá nos detalhes desta compra.";
+    }
     if (normalizedStatus === "ENTREGUE") {
       return "Pedido finalizado. Guarde essa compra no histórico.";
     }
@@ -97,6 +101,7 @@ const Sales = () => {
     const normalizedStatus = status?.toUpperCase();
     if (normalizedStatus === "APROVADO") return FiCreditCard;
     if (normalizedStatus === "PREPARANDO") return FiPackage;
+    if (normalizedStatus === "ENVIADO") return FiTruck;
     if (normalizedStatus === "ENTREGUE") return FiCheckCircle;
     if (normalizedStatus === "RECUSADO" || normalizedStatus === "CANCELADO") {
       return FiXCircle;
@@ -128,25 +133,19 @@ const Sales = () => {
       return total + paidPrice * Number(item.quantity || 0);
     }, 0);
 
-  const getSaleTotalCents = (sale: any, saleItems: any[]) => {
+  const getSaleAmounts = (sale: any, saleItems: any[]) => {
     const itemsTotal = getItemsTotalCents(saleItems);
     const rawTotal = Number(sale?.totalPrice || 0);
+    const totalIsInReais = rawTotal > 0 && (itemsTotal === 0 || rawTotal < itemsTotal);
+    const totalCents = Number.isFinite(rawTotal)
+      ? Math.max(itemsTotal, Math.round(rawTotal * (totalIsInReais ? 100 : 1)))
+      : itemsTotal;
 
-    if (itemsTotal > 0) {
-      if (Math.abs(rawTotal - itemsTotal) < 0.01) {
-        return itemsTotal;
-      }
-
-      if (Math.abs(rawTotal * 100 - itemsTotal) < 1) {
-        return itemsTotal;
-      }
-    }
-
-    if (!Number.isFinite(rawTotal)) {
-      return itemsTotal;
-    }
-
-    return rawTotal % 1 !== 0 ? Math.round(rawTotal * 100) : rawTotal;
+    return {
+      itemsCents: itemsTotal,
+      shippingCents: Math.max(0, totalCents - itemsTotal),
+      totalCents,
+    };
   };
 
   if (loading) {
@@ -193,7 +192,7 @@ const Sales = () => {
                 (total: number, item: any) => total + Number(item.quantity || 0),
                 0,
               ) || 0;
-            const totalCents = getSaleTotalCents(sale, saleItems);
+            const amounts = getSaleAmounts(sale, saleItems);
 
             return (
               <article
@@ -228,7 +227,7 @@ const Sales = () => {
                       {getStatusLabel(sale.status)}
                     </span>
                     <span className="font-semibold">
-                      {formatSimpleCurrency(totalCents)}
+                      {formatSimpleCurrency(amounts.totalCents)}
                     </span>
                     {isExpanded ? <FiChevronUp /> : <FiChevronDown />}
                   </div>
@@ -251,7 +250,14 @@ const Sales = () => {
                         </p>
                         <p className="font-medium flex gap-2 items-center">
                           <FiTruck />
-                          {sale.shipment ? "Frete" : "Retirada"}
+                          {sale.shipment ? "Entrega local" : "Retirada"}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Frete: {sale.shipment
+                            ? amounts.shippingCents > 0
+                              ? formatSimpleCurrency(amounts.shippingCents)
+                              : "Grátis"
+                            : "Grátis na retirada"}
                         </p>
                       </div>
                       <div>
@@ -259,7 +265,7 @@ const Sales = () => {
                           Valor total
                         </p>
                         <p className="font-medium">
-                          {formatSimpleCurrency(totalCents)}
+                          {formatSimpleCurrency(amounts.totalCents)}
                         </p>
                       </div>
                     </div>
@@ -277,6 +283,28 @@ const Sales = () => {
                         </p>
                       )}
                     </div>
+
+                    {sale.status?.toUpperCase() === "ENVIADO" && (
+                      <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 p-3 text-blue-950">
+                        <p className="text-xs uppercase text-blue-700">Acompanhamento</p>
+                        {sale.melhorEnvioTrackingCode ? (
+                          <a
+                            href={`https://www.melhorrastreio.com.br/rastreio/${sale.melhorEnvioTrackingCode}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-1 inline-flex font-semibold underline underline-offset-4"
+                          >
+                            Acompanhar pedido · {sale.melhorEnvioTrackingCode}
+                          </a>
+                        ) : sale.shippingMethod?.startsWith("melhor_envio:") ? (
+                          <p className="mt-1 text-sm">O código de rastreio ainda não foi disponibilizado.</p>
+                        ) : sale.shippingMethod === "local_delivery" ? (
+                          <p className="mt-1 text-sm">Entrega local sem código de rastreio.</p>
+                        ) : (
+                          <p className="mt-1 text-sm">Retirada na loja sem código de rastreio.</p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="flex flex-col gap-3">
                       {saleItems.map((item: any, index: number) => {

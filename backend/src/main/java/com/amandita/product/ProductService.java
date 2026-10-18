@@ -3,13 +3,14 @@ package com.amandita.product;
 import com.amandita.Sale.*;
 import com.amandita.customer.CustomerDTOMapper;
 import com.amandita.customer.CustomerDao;
-import com.amandita.exception.ResourceConflictException;
 import com.amandita.exception.ResourceNotFoundException;
 import com.amandita.exception.RequestValidationException;
 import com.amandita.s3.S3Buckets;
 import com.amandita.s3.S3Service;
 import com.amandita.store.Store;
 import com.amandita.store.StoreDao;
+import com.amandita.store.StorePlan;
+import com.amandita.store.StorePlanService;
 import jakarta.transaction.Transactional;
 import net.coobird.thumbnailator.Thumbnails;
 import org.apache.commons.lang3.StringUtils;
@@ -25,6 +26,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class ProductService {
+    public static final int MAX_PRODUCT_IMAGES = 5;
+
     private final ProductDao productDao;
     private final SaleDao saleDao;
     private final CustomerDao customerDao;
@@ -53,9 +56,19 @@ public class ProductService {
                 .map(productDTOMapper);
     }
 
+    public Page<ProductDTO> getPublishedProductsByStore(int page, int size, Long storeId) {
+        return productDao.selectPublishedProductsByStore(page, size, storeId)
+                .map(productDTOMapper);
+    }
+
     @SuppressWarnings("unchecked")
     public Page<ProductDTO> findProductsByCategoryByStore(String category, int page, int size, Long storeId) {
         return productDao.findProductsByCategoryByStore(category, page, size, storeId)
+                .map(productDTOMapper);
+    }
+
+    public Page<ProductDTO> findPublishedProductsByCategoryByStore(String category, int page, int size, Long storeId) {
+        return productDao.findPublishedProductsByCategoryByStore(category, page, size, storeId)
                 .map(productDTOMapper);
     }
 
@@ -68,6 +81,11 @@ public class ProductService {
     @SuppressWarnings("unchecked")
     public Page<ProductDTO> findProductsByNameByStore(String query, int page, int size, Long storeId) {
         return productDao.findProductsByNameByStore(query, page, size, storeId)
+                .map(productDTOMapper);
+    }
+
+    public Page<ProductDTO> findPublishedProductsByNameByStore(String query, int page, int size, Long storeId) {
+        return productDao.findPublishedProductsByNameByStore(query, page, size, storeId)
                 .map(productDTOMapper);
     }
 
@@ -84,6 +102,14 @@ public class ProductService {
         return productDTOMapper.apply(requireProductByIdAndStore(productId, storeId));
     }
 
+    public ProductDTO getPublishedProductByIdAndStore(Integer productId, Long storeId) {
+        Product product = productDao.selectPublishedProductByIdAndStore(productId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "produto com id [%s] não encontrado nesta loja".formatted(productId)
+                ));
+        return productDTOMapper.apply(product);
+    }
+
     public Product requireProductByIdAndStore(Integer productId, Long storeId) {
         return productDao.selectProductByIdAndStore(productId, storeId)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -91,8 +117,9 @@ public class ProductService {
                 ));
     }
 
+    @Transactional
     public Integer addProduct(ProductRegistrationRequest productRegistrationRequest, Long storeId) {
-        Store store = storeDao.findById(storeId)
+        Store store = storeDao.findByIdForUpdate(storeId)
                 .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
         Product product = new Product(
                 productRegistrationRequest.name(),
@@ -104,9 +131,34 @@ public class ProductService {
                 productRegistrationRequest.profileImageId(),
                 productRegistrationRequest.promo()
         );
+        product.setWeightKg(productRegistrationRequest.weightKg());
+        product.setWidthCm(productRegistrationRequest.widthCm());
+        product.setHeightCm(productRegistrationRequest.heightCm());
+        product.setLengthCm(productRegistrationRequest.lengthCm());
         product.setStore(store);
+        product.setPublished(store.getPlan() == StorePlan.COMPLETE
+                || productDao.countPublishedProductsByStore(storeId) < StorePlanService.FREE_PUBLISHED_PRODUCT_LIMIT);
         Product addedProduct = productDao.insertProduct(product);
         return addedProduct.getId();
+    }
+
+    @Transactional
+    public ProductDTO setProductPublished(Integer productId, boolean published, Long storeId) {
+        Store store = storeDao.findByIdForUpdate(storeId)
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
+        Product product = requireProductByIdAndStore(productId, storeId);
+        if (published && !product.isPublished()) {
+            if (store.getPlan() == StorePlan.FREE
+                    && productDao.countPublishedProductsByStore(storeId) >= StorePlanService.FREE_PUBLISHED_PRODUCT_LIMIT) {
+                throw new IllegalStateException(
+                        "O plano Grátis permite até 10 produtos publicados. Pause outro produto para publicar este.");
+            }
+            product.setPublished(true);
+        } else if (!published) {
+            product.setPublished(false);
+        }
+        productDao.updateProduct(product);
+        return productDTOMapper.apply(product);
     }
 
     @Transactional
@@ -114,8 +166,9 @@ public class ProductService {
         Product product = requireProductByIdAndStore(productId, storeId);
 
         if (productRequest.variations() != null) {
-            List<ProductVariation> newVariations = productRequest.variations().stream()
-                    .map(comboDto -> {
+            List<ProductVariation> newVariations = new java.util.ArrayList<>();
+            for (int index = 0; index < productRequest.variations().size(); index++) {
+                    var comboDto = productRequest.variations().get(index);
                         ProductVariation pv = new ProductVariation();
                         pv.setProduct(product);
                         pv.setSku(generateSku(product.getName(), comboDto.options()));
@@ -123,8 +176,9 @@ public class ProductService {
                         pv.setQuantity(parseInteger(comboDto.quantity()));
                         pv.setPromo(comboDto.promo());
                         pv.setOptions(comboDto.options());
-                        return pv;
-                    }).toList();
+                        pv.setDisplayOrder(index);
+                        newVariations.add(pv);
+            }
 
             product.getVariations().addAll(newVariations);
         }
@@ -188,6 +242,11 @@ public class ProductService {
         if (req.promo() != null && !req.promo().equals(product.getPromo()))
             product.setPromo(req.promo());
 
+        product.setWeightKg(req.weightKg());
+        product.setWidthCm(req.widthCm());
+        product.setHeightCm(req.heightCm());
+        product.setLengthCm(req.lengthCm());
+
         if (req.variations() != null) {
             syncProductVariations(product, req.variations());
         }
@@ -204,7 +263,8 @@ public class ProductService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
 
-        for (ProductVariationDTO comboDto : variationRequests) {
+        for (int index = 0; index < variationRequests.size(); index++) {
+            ProductVariationDTO comboDto = variationRequests.get(index);
             ProductVariation variation = comboDto.id() != null ? existingById.get(comboDto.id()) : null;
             if (variation == null) {
                 variation = new ProductVariation();
@@ -212,6 +272,7 @@ public class ProductService {
                 product.getVariations().add(variation);
             }
 
+            variation.setDisplayOrder(index);
             applyVariationData(product, variation, comboDto);
         }
 
@@ -250,23 +311,14 @@ public class ProductService {
     public void updateProductProfileImage(Integer productId,
                                           MultipartFile file,
                                           Long storeId) {
-        requireProductByIdAndStore(productId, storeId);
-        String profileImageId = UUID.randomUUID().toString();
-        try {
-            s3Service.putObject(
-                    s3Buckets.getProduct(),
-                    "profile-images/%s/%s.jpg".formatted(productId, profileImageId),
-                    file.getBytes()
-            );
-        } catch (IOException e) {
-            throw new RuntimeException("failed to upload profile image", e);
-        }
-        productDao.updateProductImageId(profileImageId, productId);
+        updateProductImages(productId, List.of(file), List.of(), storeId);
     }
 
     public void updateProductImages(Integer productId, List<MultipartFile> files, @NotNull List<String> imagesToDelete, Long storeId) {
         requireProductByIdAndStore(productId, storeId);
-        // 1. Remove imagens antigas se solicitado
+        List<String> existingImageIds = productDao.selectAllImageIdsByProductId(productId);
+        validateProductImageCount(existingImageIds, files, imagesToDelete);
+
         for (String imageId : imagesToDelete) {
             s3Service.deleteObject(
                     s3Buckets.getProduct(),
@@ -314,8 +366,41 @@ public class ProductService {
         }
     }
 
+    public void validateNewProductImageCount(int imageCount) {
+        if (imageCount > MAX_PRODUCT_IMAGES) {
+            throw new RequestValidationException(
+                    "Cada produto pode ter no máximo %d imagens.".formatted(MAX_PRODUCT_IMAGES));
+        }
+    }
+
+    public void validateProductImageCount(Integer productId, List<MultipartFile> files,
+                                          List<String> imagesToDelete, Long storeId) {
+        requireProductByIdAndStore(productId, storeId);
+        validateProductImageCount(
+                productDao.selectAllImageIdsByProductId(productId),
+                files,
+                imagesToDelete
+        );
+    }
+
+    private void validateProductImageCount(List<String> existingImageIds, List<MultipartFile> files,
+                                           List<String> imagesToDelete) {
+        Set<String> imagesBeingDeleted = new HashSet<>(imagesToDelete);
+        long remainingImages = existingImageIds.stream()
+                .filter(imageId -> !imagesBeingDeleted.contains(imageId))
+                .count();
+        if (remainingImages + files.size() > MAX_PRODUCT_IMAGES) {
+            throw new RequestValidationException(
+                    "Cada produto pode ter no máximo %d imagens.".formatted(MAX_PRODUCT_IMAGES));
+        }
+    }
+
     public byte[] getProductProfileImage(Integer productId, String imageId, Long storeId) {
-        ProductDTO productDTO = productDTOMapper.apply(requireProductByIdAndStore(productId, storeId));
+        Product product = productDao.selectProductForImageByIdAndStore(productId, storeId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "produto com id [%s] não encontrado nesta loja".formatted(productId)
+                ));
+        ProductDTO productDTO = productDTOMapper.apply(product);
         String selectedImageId = StringUtils.isNotBlank(imageId) ? imageId : productDTO.profileImageId();
 
         if (StringUtils.isBlank(selectedImageId)) {
@@ -331,29 +416,8 @@ public class ProductService {
 
     public void deleteProductById(Integer productId, Long storeId) {
         Product product = requireProductByIdAndStore(productId, storeId);
-
-        if (productDao.existsSaleItemByProductId(productId) || productDao.existsHistoryByProductId(productId)) {
-            throw new ResourceConflictException(
-                    "Não é possível deletar este produto porque ele já está vinculado à venda ou histórico."
-            );
-        }
-
-        // Recupera todas as imagens associadas ao produto antes do banco remover os vinculos.
-        Set<String> imageIds = new LinkedHashSet<>(productDao.selectAllImageIdsByProductId(productId));
-        if (StringUtils.isNotBlank(product.getProfileImageId())) {
-            imageIds.add(product.getProfileImageId());
-        }
-
-        // Remove o produto do banco primeiro. Se houver alguma restricao, as imagens continuam preservadas.
-        productDao.deleteProductById(productId);
-
-        // Deleta todas as imagens do S3 depois que o banco confirma a remocao.
-        for (String imageId : imageIds) {
-            s3Service.deleteObject(
-                    s3Buckets.getProduct(),
-                    "profile-images/%s/%s.jpg".formatted(productId, imageId)
-            );
-        }
+        product.setActive(false);
+        productDao.updateProduct(product);
     }
 
     @Transactional
@@ -365,8 +429,11 @@ public class ProductService {
         double totalPrice = 0.0;
 
         for (SaleItemRequest request : saleRequest.getSaleItemRequests()) {
-            Product product = productDao.selectProductById(request.getProductId())
+            Product product = productDao.selectProductByIdAndStore(request.getProductId(), storeId)
                     .orElseThrow(() -> new IllegalArgumentException("Product not found with id: " + request.getProductId()));
+            if (!product.isPublished()) {
+                throw new IllegalArgumentException("Este produto não está publicado para venda.");
+            }
 
             ProductVariation variation = null;
             Integer unitPrice = product.getPrice();
@@ -405,10 +472,15 @@ public class ProductService {
         sale.setTotalPrice(totalPrice);
         sale.setSaleItems(saleItems);
         sale.setStatus("ENTREGUE");
+        sale.setStockDecremented(true);
         sale.setCustomer(
                 customerDao.selectUserByEmail(saleRequest.getCustomerEmail()).orElse(null)
         );
         sale.setPaymentMethod(saleRequest.getPaymentMethod());
+        sale.setShippingMethod(saleRequest.getShippingMethod());
+        sale.setShippingFee(saleRequest.getShippingFee() == null ? 0 : saleRequest.getShippingFee().intValue());
+        sale.setShippingZip(saleRequest.getShippingZip());
+        sale.setShippingQuote(saleRequest.getShippingQuote());
         sale.setStore(store);
         saleDao.insertSale(sale);
 
@@ -438,6 +510,7 @@ public class ProductService {
                 "PENDENTE",
                 "APROVADO",
                 "PREPARANDO",
+                "ENVIADO",
                 "ENTREGUE",
                 "CANCELADO",
                 "RECUSADO"

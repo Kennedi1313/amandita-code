@@ -66,6 +66,7 @@ public class StoreInterceptor implements HandlerInterceptor {
                 || path.startsWith("/api/v1/products")
                 || path.startsWith("/api/v1/customers")
                 || path.startsWith("/api/v1/payment/asaas/checkout")
+                || path.startsWith("/api/v1/payment/mercadopago")
                 || path.startsWith("/api/v1/melhorenvio");
     }
 

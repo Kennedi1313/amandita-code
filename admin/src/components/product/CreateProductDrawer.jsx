@@ -20,8 +20,7 @@ const CreateProductDrawer = ({ fetchProducts }) => {
   return (
     <>
       <Button
-        backgroundColor="#ebe5fc"
-        color={"#5f5482"}
+        colorScheme="brand"
         leftIcon={<FiPlusCircle />}
         onClick={onOpen}
       >

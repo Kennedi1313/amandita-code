@@ -162,7 +162,7 @@ const Sell = () => {
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
       />
-      <Button onClick={handleSearch} colorScheme="blue">
+      <Button onClick={handleSearch} colorScheme="brand">
         Pesquisar
       </Button>
 
@@ -195,7 +195,7 @@ const Sell = () => {
             )}
           </ModalBody>
           <ModalFooter>
-            <Button colorScheme="blue" onClick={onClose}>
+            <Button colorScheme="brand" onClick={onClose}>
               Fechar
             </Button>
           </ModalFooter>
@@ -357,9 +357,9 @@ const Sell = () => {
             </Button>
             <Button
               width="full"
-              bg="blue.700"
+              bg="brand.800"
               color="white"
-              _hover={{ bg: "blue.600" }}
+              _hover={{ bg: "brand.700" }}
               onClick={() => setStep(2)}
             >
               Próximo

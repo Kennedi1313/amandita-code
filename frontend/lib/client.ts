@@ -15,7 +15,7 @@ if (typeof window !== "undefined") {
     (response) => response,
     (error) => {
       const status = error.response?.status;
-      if (status === 401 || status === 403) {
+      if (status === 401) {
         localStorage.removeItem("access_token");
         const currentPath = `${window.location.pathname}${window.location.search}`;
         if (!window.location.pathname.startsWith("/login")) {
@@ -155,6 +155,18 @@ export const createAsaasCheckout = async (checkoutData: any) => {
   }
 };
 
+export const createMercadoPagoCheckout = async (checkoutData: any) => {
+  return axios.post(`${getUrl()}/payment/mercadopago/checkout`, checkoutData, {
+    headers: {
+      ...getAuthConfig().headers,
+      "Content-Type": "application/json",
+    },
+  });
+};
+
+export const getMercadoPagoSaleStatus = async (saleId: string | number) =>
+  axios.get(`${getUrl()}/payment/mercadopago/sale/${saleId}`, getAuthConfig());
+
 export const getSales = async () => {
   try {
     return await axios.get(`${getUrl()}/products/sales`, getStoreRequestConfig());
@@ -216,6 +228,17 @@ export const getStoreInfo = async () => {
   } catch (e) {
     throw e;
   }
+};
+
+export const getLocalDeliveryQuote = async (zip: string, subtotal: number) => {
+  return axios.get(`${getUrl()}/store/shipping/quote`, {
+    ...getStoreRequestConfig(),
+    params: { zip, subtotal },
+  });
+};
+
+export const getMelhorEnvioQuote = async (payload: Record<string, unknown>) => {
+  return axios.post(`${getUrl()}/melhorenvio/quote`, payload, getStoreRequestConfig());
 };
 
 export const getStoreInfoByDomain = async (domain: string) => {

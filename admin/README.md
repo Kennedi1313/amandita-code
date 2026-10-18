@@ -1,6 +1,6 @@
-# Amandita Admin
+# KIZI Admin
 
-This service is the admin user interface for the Amandita application.
+This service is the admin user interface for the KIZI platform.
 
 ## Stack
 

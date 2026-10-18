@@ -45,7 +45,7 @@ const Pagination = (props) => {
       <Button
         isDisabled={currentPage === 0}
         variant="ghost"
-        color={"#5f5482"}
+        color={"#1f633c"}
         onClick={onPrevious}
         size="sm"
       >
@@ -55,7 +55,7 @@ const Pagination = (props) => {
       {paginationRange?.map((pageNumber, index) => {
         if (pageNumber === DOTS) {
           return (
-            <Box color={"#5f5482"} key={index} className="pagination-item dots">
+            <Box color={"#1f633c"} key={index} className="pagination-item dots">
               &#8230;
             </Box>
           );
@@ -66,11 +66,11 @@ const Pagination = (props) => {
             key={pageNumber}
             onClick={() => onPageChange(pageNumber)}
             size="sm"
-            color={"#5f5482"}
+            color={"#1f633c"}
             variant={pageNumber === currentPage ? "solid" : "ghost"}
-            backgroundColor={pageNumber === currentPage ? "#ebe5fc" : undefined}
+            backgroundColor={pageNumber === currentPage ? "#e4f2d5" : undefined}
             borderBottom={pageNumber === currentPage ? "2px solid" : undefined}
-            borderColor={pageNumber === currentPage ? "#5f5482" : undefined}
+            borderColor={pageNumber === currentPage ? "#1f633c" : undefined}
           >
             {pageNumber + 1}
           </Button>
@@ -80,7 +80,7 @@ const Pagination = (props) => {
       <Button
         isDisabled={currentPage === lastPage}
         variant="ghost"
-        color={"#5f5482"}
+        color={"#1f633c"}
         onClick={onNext}
         size="sm"
       >

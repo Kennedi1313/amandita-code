@@ -40,8 +40,13 @@ public class ProductDTOMapper implements Function<Product, ProductDTO> {
                 product.getCategory(),
                 product.getprofileImageId(),
                 product.getPromo(),
+                product.isPublished(),
                 imagesIds,
-                variationDTOs
+                variationDTOs,
+                product.getWeightKg(),
+                product.getWidthCm(),
+                product.getHeightCm(),
+                product.getLengthCm()
         );
     }
 

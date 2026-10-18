@@ -13,6 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -35,8 +36,12 @@ public class ProductController {
     public Page<ProductDTO> getProductsByStore(
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
-            HttpServletRequest httpRequest) {
-        return productService.getAllProductsByStore(page, size, (Long) httpRequest.getAttribute("storeId"));
+            HttpServletRequest httpRequest,
+            Authentication authentication) {
+        Long storeId = (Long) httpRequest.getAttribute("storeId");
+        return isAdmin(authentication)
+                ? productService.getAllProductsByStore(page, size, storeId)
+                : productService.getPublishedProductsByStore(page, size, storeId);
     }
 
     @GetMapping("/no-store")
@@ -49,9 +54,13 @@ public class ProductController {
     @GetMapping("{productId}")
     public ProductDTO getProduct(
             @PathVariable("productId") Integer productId,
-            HttpServletRequest httpRequest
+            HttpServletRequest httpRequest,
+            Authentication authentication
     ) {
-        return productService.getProductByIdAndStore(productId, (Long) httpRequest.getAttribute("storeId"));
+        Long storeId = (Long) httpRequest.getAttribute("storeId");
+        return isAdmin(authentication)
+                ? productService.getProductByIdAndStore(productId, storeId)
+                : productService.getPublishedProductByIdAndStore(productId, storeId);
     }
 
     @GetMapping("{productId}/no-store")
@@ -66,8 +75,12 @@ public class ProductController {
             @RequestParam("category") String category,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
-            HttpServletRequest httpRequest) {
-        return productService.findProductsByCategoryByStore(category, page, size, (Long) httpRequest.getAttribute("storeId"));
+            HttpServletRequest httpRequest,
+            Authentication authentication) {
+        Long storeId = (Long) httpRequest.getAttribute("storeId");
+        return isAdmin(authentication)
+                ? productService.findProductsByCategoryByStore(category, page, size, storeId)
+                : productService.findPublishedProductsByCategoryByStore(category, page, size, storeId);
     }
 
     @GetMapping("/by-category/no-store")
@@ -83,8 +96,12 @@ public class ProductController {
             @RequestParam("query") String query,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
-            HttpServletRequest httpRequest) {
-        return productService.findProductsByNameByStore(query, page, size, (Long) httpRequest.getAttribute("storeId"));
+            HttpServletRequest httpRequest,
+            Authentication authentication) {
+        Long storeId = (Long) httpRequest.getAttribute("storeId");
+        return isAdmin(authentication)
+                ? productService.findProductsByNameByStore(query, page, size, storeId)
+                : productService.findPublishedProductsByNameByStore(query, page, size, storeId);
     }
 
     @PostMapping
@@ -110,6 +127,7 @@ public class ProductController {
             @RequestPart("files") List<MultipartFile> files,
             HttpServletRequest httpRequest) {
 
+        productService.validateNewProductImageCount(files.size());
         Long storeId = (Long) httpRequest.getAttribute("storeId");
 
         Integer productId = productService.addProduct(productRequest, storeId);
@@ -141,6 +159,19 @@ public class ProductController {
         productService.deleteProductById(productId, (Long) httpRequest.getAttribute("storeId"));
     }
 
+    @PutMapping("{productId}/publication")
+    public ResponseEntity<?> setProductPublication(
+            @PathVariable Integer productId,
+            @RequestBody ProductPublicationRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            return ResponseEntity.ok(productService.setProductPublished(
+                    productId, request.published(), (Long) httpRequest.getAttribute("storeId")));
+        } catch (IllegalStateException exception) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(exception.getMessage());
+        }
+    }
+
     @PutMapping(value = "{productId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public void updateProduct(
             @PathVariable("productId") Integer productId,
@@ -149,8 +180,6 @@ public class ProductController {
             HttpServletRequest httpRequest
     ) {
         Long storeId = (Long) httpRequest.getAttribute("storeId");
-        productService.updateProduct(productId, productUpdateRequest, storeId);
-
         List<String> imagesToDelete = productUpdateRequest.imagesToDelete() == null
                 ? List.of()
                 : productUpdateRequest.imagesToDelete();
@@ -158,6 +187,8 @@ public class ProductController {
             files = new ArrayList<>();
         }
 
+        productService.validateProductImageCount(productId, files, imagesToDelete, storeId);
+        productService.updateProduct(productId, productUpdateRequest, storeId);
         productService.updateProductImages(productId, files, imagesToDelete, storeId);
     }
 
@@ -171,6 +202,12 @@ public class ProductController {
     @PostMapping("/sell")
     public ResponseEntity<Void> sellProducts(@RequestBody SaleRequest saleRequest) {
         return ResponseEntity.status(HttpStatus.GONE).build();
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_ADMIN"::equals);
     }
 
     @GetMapping("/sales")

@@ -15,6 +15,10 @@ export default function Home({ products, category, itemsCount }: HomeProps) {
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
+    setCurrentPage(0);
+  }, [category, setCurrentPage]);
+
+  useEffect(() => {
     fetchProducts();
   }, [currentPage, category]);
 
@@ -32,8 +36,8 @@ export default function Home({ products, category, itemsCount }: HomeProps) {
 
   const renderProductList = () => (
     <div>
-      <div className="mt-20 md:mt-36 md:max-w-screen-lg mx-auto flex items-center justify-center px-2 md:px-0 py-5 my-2">
-        <div className="z-30 md:max-w-screen-lg mx-auto center grid lg:grid-cols-4 grid-cols-2 w-full gap-2 gap-y-4 min-h-[57rem]">
+      <div className="mt-20 md:mt-36 md:max-w-screen-lg mx-auto flex items-start justify-center px-2 md:px-0 py-5 my-2">
+        <div className="z-30 md:max-w-screen-lg mx-auto grid w-full grid-cols-2 content-start items-start gap-2 gap-y-4 lg:grid-cols-4">
           {productList.map((item) => (
             <Item
               key={item.id}
@@ -61,7 +65,15 @@ export default function Home({ products, category, itemsCount }: HomeProps) {
 
   const renderEmptyState = () => (
     <div className="mt-36 md:max-w-screen-lg mx-auto flex flex-col items-center justify-center px-1 md:px-0 py-5 my-2">
-      <h1>NENHUM PRODUTO CADASTRADO NESSA CATEGORIA</h1>
+      <div className="rounded-2xl border border-gray-200 bg-white px-6 py-14 text-center shadow-sm">
+        <p className="text-lg font-semibold text-gray-900">
+          Novidades em breve
+        </p>
+        <p className="mt-2 text-sm text-gray-600">
+          Estamos preparando os produtos desta vitrine. Volte em breve
+          para conferir.
+        </p>
+      </div>
     </div>
   );
 

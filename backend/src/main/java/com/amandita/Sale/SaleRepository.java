@@ -8,11 +8,13 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.Optional;
+import java.util.List;
 import jakarta.persistence.LockModeType;
 
 @Transactional
 public interface SaleRepository extends JpaRepository<Sale, Long> {
     Page<Sale> findAllByStoreId(Long storeId, Pageable pageable);
+    List<Sale> findByStore_IdAndPaymentMethodAndStatus(Long storeId, String paymentMethod, String status);
 
     @Query("SELECT s FROM Sale s JOIN s.customer c WHERE c.email = ?1")
     Page<Sale> findAllByUserEmail(String email, Pageable pageable);

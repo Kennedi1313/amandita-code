@@ -15,17 +15,18 @@ import {
   Text,
   useDisclosure,
 } from "@chakra-ui/react";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import {
   deleteProduct,
   productsPictureUrl,
+  setProductPublished,
 } from "../../services/product-client.js";
 import {
   errorNotification,
   successNotification,
 } from "../../services/notification.js";
 import UpdateProductDrawer from "./UpdateProductDrawer.jsx";
-import { FiEdit, FiPackage, FiTrash2 } from "react-icons/fi";
+import { FiEdit, FiPackage, FiPause, FiPlay, FiTrash2 } from "react-icons/fi";
 
 export default function CardWithImage({
   id,
@@ -37,10 +38,39 @@ export default function CardWithImage({
   description,
   promo,
   variations,
+  weightKg,
+  widthCm,
+  heightCm,
+  lengthCm,
   fetchProducts,
+  published = true,
 }) {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cancelRef = useRef();
+  const [isPublicationUpdating, setPublicationUpdating] = useState(false);
+
+  const togglePublication = async () => {
+    setPublicationUpdating(true);
+    try {
+      await setProductPublished(id, !published);
+      successNotification(
+        published ? "Produto pausado" : "Produto publicado",
+        published
+          ? "O produto continua salvo no painel e não aparece na loja."
+          : "O produto voltou a aparecer na loja.",
+      );
+      await fetchProducts();
+    } catch (err) {
+      errorNotification(
+        err.code || "Erro",
+        err.response?.data?.message ||
+          (typeof err.response?.data === "string" ? err.response.data : null) ||
+          "Não foi possível alterar a publicação do produto.",
+      );
+    } finally {
+      setPublicationUpdating(false);
+    }
+  };
 
   return (
     <Box
@@ -60,6 +90,7 @@ export default function CardWithImage({
         quantity={quantity}
         promo={promo}
         variations={variations}
+        published={published}
       />
 
       <Stack spacing={3} p={3} minH="170px">
@@ -70,8 +101,6 @@ export default function CardWithImage({
           quantity={quantity}
         />
 
-        <Box flex="1" />
-
         <ActionButtons
           id={id}
           name={name}
@@ -81,19 +110,26 @@ export default function CardWithImage({
           quantity={quantity}
           promo={promo}
           description={description}
+          weightKg={weightKg}
+          widthCm={widthCm}
+          heightCm={heightCm}
+          lengthCm={lengthCm}
           onOpen={onOpen}
           variations={variations}
           fetchProducts={fetchProducts}
           isOpen={isOpen}
           onClose={onClose}
           cancelRef={cancelRef}
+          published={published}
+          isPublicationUpdating={isPublicationUpdating}
+          onTogglePublication={togglePublication}
         />
       </Stack>
     </Box>
   );
 }
 
-const ImageSection = ({ id, category, quantity, promo, variations }) => {
+const ImageSection = ({ id, category, quantity, promo, variations, published }) => {
   const totalQuantity =
     variations && variations.length > 0
       ? variations.reduce((acc, variation) => acc + Number(variation.quantity || 0), 0)
@@ -115,9 +151,9 @@ const ImageSection = ({ id, category, quantity, promo, variations }) => {
         top={2}
         left={2}
         bg="white"
-        color="#5f5482"
+        color="#1f633c"
         border="1px solid"
-        borderColor="#ebe5fc"
+        borderColor="#e4f2d5"
         fontWeight="semibold"
         px={2}
         py={1}
@@ -126,6 +162,21 @@ const ImageSection = ({ id, category, quantity, promo, variations }) => {
         noOfLines={1}
       >
         {category}
+      </Tag>
+
+      <Tag 
+        colorScheme={published ? "brand" : "orange"}
+        position="absolute"
+        top={10}
+        left={2}
+        border="1px solid"
+        fontWeight="semibold"
+        px={2}
+        py={1}
+        borderRadius="full"
+        maxW="calc(100% - 72px)"
+        noOfLines={1}>
+        {published ? "Publicado na loja" : "Pausado"}
       </Tag>
 
       <Tag
@@ -154,7 +205,7 @@ const ImageSection = ({ id, category, quantity, promo, variations }) => {
 
         {variations?.length > 0 && (
           <Tag
-            bg="purple.600"
+            bg="brand.600"
             color="white"
             fontWeight="semibold"
             borderRadius="full"
@@ -177,16 +228,15 @@ const ProductDetails = ({ name, price, variations, quantity }) => {
     ? (() => {
         const prices = variations
           .map((variation) =>
-            parseFloat(String(variation.price || "").replace(".", "").replace(",", ".")),
-          )
+            parseFloat(String(variation.price || "").replace(".", "").replace(",", ".")))
           .filter((variationPrice) => variationPrice > 0);
-        if (prices.length === 0) return "0,00";
+        if (prices.length === 0) return "R$ 0,00";
 
         const min = Math.min(...prices);
         const max = Math.max(...prices);
         const format = (value) => value.toFixed(2).replace(".", ",");
 
-        return `${format(min)} ~ ${format(max)}`;
+        return `R$ ${format(min)} ~ R$ ${format(max)}`;
       })()
     : null;
 
@@ -194,7 +244,7 @@ const ProductDetails = ({ name, price, variations, quantity }) => {
     <Stack spacing={2}>
       <Text
         fontSize="md"
-        lineHeight="short"
+        lineHeight="shorter"
         h="40px"
         noOfLines={2}
         fontWeight="semibold"
@@ -220,16 +270,8 @@ const ProductDetails = ({ name, price, variations, quantity }) => {
           whiteSpace="nowrap"
           noOfLines={1}
         >
-          {hasVariations ? variationPriceText : price}
+          {hasVariations ? variationPriceText : `R$ ${price}`}
         </Text>
-        <Tag
-          size="sm"
-          borderRadius="full"
-          colorScheme={totalQuantity > 0 ? "green" : "red"}
-          flexShrink={0}
-        >
-          {totalQuantity > 0 ? "Em estoque" : "Sem estoque"}
-        </Tag>
       </Flex>
     </Stack>
   );
@@ -244,37 +286,57 @@ const ActionButtons = ({
   quantity,
   promo,
   description,
+  weightKg,
+  widthCm,
+  heightCm,
+  lengthCm,
   onOpen,
   variations,
   fetchProducts,
   isOpen,
   onClose,
   cancelRef,
+  published,
+  isPublicationUpdating,
+  onTogglePublication,
 }) => (
   <>
+    <UpdateProductDrawer
+      buttonProps={{
+        size: "sm",
+        colorScheme: "brand",
+        leftIcon: <FiEdit />,
+      }}
+      initialValues={{
+        id,
+        name,
+        description,
+        originalPrice,
+        price,
+        quantity,
+        category,
+        weightKg,
+        widthCm,
+        heightCm,
+        lengthCm,
+        promo,
+        variations,
+      }}
+      productId={id}
+      fetchProducts={fetchProducts}
+    />
     <Flex direction="row" justify="center" gap={2}>
-      <UpdateProductDrawer
-        buttonProps={{
-          size: "sm",
-          colorScheme: "purple",
-          bg: "#5f5482",
-          leftIcon: <FiEdit />,
-          _hover: { bg: "#4f456e" },
-        }}
-        initialValues={{
-          id,
-          name,
-          description,
-          originalPrice,
-          price,
-          quantity,
-          category,
-          promo,
-          variations,
-        }}
-        productId={id}
-        fetchProducts={fetchProducts}
-      />
+      <Button
+        size="sm"
+        width="full"
+        variant="outline"
+        colorScheme={published ? "orange" : "green"}
+        isLoading={isPublicationUpdating}
+        onClick={onTogglePublication}
+        leftIcon={published ? <FiPause /> : <FiPlay />}
+      >
+        {published ? "Pausar" : "Publicar"}
+      </Button>
       <Button
         size="sm"
         margin={0}
@@ -316,11 +378,11 @@ const DeleteAlertDialog = ({
     <AlertDialogOverlay>
       <AlertDialogContent>
         <AlertDialogHeader fontSize="lg" fontWeight="bold">
-          Deletar Produto
+          Excluir Produto
         </AlertDialogHeader>
         <AlertDialogBody>
-          Tem certeza que deseja deletar {name}? Essa ação não pode ser
-          desfeita.
+          Tem certeza que deseja excluir {name}? Ele deixará de aparecer na
+          loja e na lista de produtos. Os pedidos anteriores serão mantidos.
         </AlertDialogBody>
         <AlertDialogFooter>
           <Button ref={cancelRef} onClick={onClose}>
@@ -332,8 +394,8 @@ const DeleteAlertDialog = ({
               try {
                 await deleteProduct(id);
                 successNotification(
-                  "Produto deletado",
-                  `${name} foi deletado com sucesso.`,
+                  "Produto excluído",
+                  `${name} foi removido da loja.`,
                 );
                 try {
                   await fetchProducts();
@@ -351,7 +413,7 @@ const DeleteAlertDialog = ({
             }}
             ml={3}
           >
-            Deletar
+            Excluir
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

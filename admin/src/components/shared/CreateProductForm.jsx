@@ -5,6 +5,7 @@ import {
   Button,
   FormLabel,
   Stack,
+  Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
@@ -84,6 +85,10 @@ const CreateProductForm = ({ fetchProducts }) => {
       category: "",
       promo: "0",
       productType: "single",
+      weightKg: "",
+      widthCm: "",
+      heightCm: "",
+      lengthCm: "",
     },
     validationSchema: Yup.object({
       name: Yup.string()
@@ -117,6 +122,10 @@ const CreateProductForm = ({ fetchProducts }) => {
         category: product.category,
         productType: product.productType,
         variations: finalVariations,
+        weightKg: product.weightKg || null,
+        widthCm: product.widthCm || null,
+        heightCm: product.heightCm || null,
+        lengthCm: product.lengthCm || null,
       };
 
       const formData = new FormData();
@@ -174,8 +183,8 @@ const CreateProductForm = ({ fetchProducts }) => {
                 label="Nome"
                 name="name"
                 type="text"
-                borderColor="#ebe5fc"
-                focusBorderColor="#5f5482"
+                borderColor="#e4f2d5"
+                focusBorderColor="#1f633c"
               />
 
               <Box>
@@ -183,8 +192,8 @@ const CreateProductForm = ({ fetchProducts }) => {
                 <Textarea
                   id="description"
                   name="description"
-                  focusBorderColor="#5f5482"
-                  borderColor="#ebe5fc"
+                  focusBorderColor="#1f633c"
+                  borderColor="#e4f2d5"
                   value={formik.values.description}
                   onChange={(e) =>
                     formik.setFieldValue("description", e.target.value)
@@ -195,8 +204,8 @@ const CreateProductForm = ({ fetchProducts }) => {
               <MySelectInput
                 label="Categoria"
                 name="category"
-                borderColor="#ebe5fc"
-                focusBorderColor="#5f5482"
+                borderColor="#e4f2d5"
+                focusBorderColor="#1f633c"
               >
                 <option disabled value="">
                   (Selecione uma categoria)
@@ -217,8 +226,8 @@ const CreateProductForm = ({ fetchProducts }) => {
                 <MySelectInput
                   label="Tipo de produto"
                   name="productType"
-                  borderColor="#ebe5fc"
-                  focusBorderColor="#5f5482"
+                  borderColor="#e4f2d5"
+                  focusBorderColor="#1f633c"
                   mb={5}
                 >
                   <option value="single">Produto único</option>
@@ -241,8 +250,8 @@ const CreateProductForm = ({ fetchProducts }) => {
                       label="Promoção (%)"
                       name="promo"
                       type="number"
-                      borderColor="#ebe5fc"
-                      focusBorderColor="#5f5482"
+                      borderColor="#e4f2d5"
+                      focusBorderColor="#1f633c"
                       placeholder="0"
                     />
 
@@ -250,8 +259,8 @@ const CreateProductForm = ({ fetchProducts }) => {
                       label="Quantidade em estoque"
                       name="quantity"
                       type="number"
-                      borderColor="#ebe5fc"
-                      focusBorderColor="#5f5482"
+                      borderColor="#e4f2d5"
+                      focusBorderColor="#1f633c"
                       placeholder="0"
                     />
                   </>
@@ -266,9 +275,22 @@ const CreateProductForm = ({ fetchProducts }) => {
               </Stack>
             </Stack>
 
+            <Stack p={4} border="1px solid #eee" borderRadius="md">
+              <FormLabel mb={0}>Dimensões e peso para cálculo de frete</FormLabel>
+              <Text fontSize="sm" color="gray.500">Informe o produto embalado. Usado pelo Melhor Envio.</Text>
+              <Text fontSize="sm" color="orange.700" mt={2}>
+                Informe medidas e peso reais da embalagem. Divergências podem gerar cobranças adicionais diretamente na conta do Melhor Envio.
+              </Text>
+              <Stack direction={{ base: "column", md: "row" }}>
+                <MyTextInput label="Peso (kg)" name="weightKg" type="number" step="0.001" placeholder="Ex.: 0,500" />
+                <MyTextInput label="Largura (cm)" name="widthCm" type="number" placeholder="Ex.: 20" />
+                <MyTextInput label="Altura (cm)" name="heightCm" type="number" placeholder="Ex.: 10" />
+                <MyTextInput label="Comprimento (cm)" name="lengthCm" type="number" placeholder="Ex.: 30" />
+              </Stack>
+            </Stack>
+
             <Button
-              backgroundColor="#5f5482"
-              color={"white"}
+              colorScheme="brand"
               marginTop={"3rem"}
               padding={"1.5rem"}
               type="submit"

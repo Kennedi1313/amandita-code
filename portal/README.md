@@ -1,4 +1,4 @@
-# Mostra Digital Portal
+# KIZI Portal
 
 Public SaaS portal for store owner signup.
 

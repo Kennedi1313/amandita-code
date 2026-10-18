@@ -25,39 +25,67 @@ public class ProductJPADataAccessService implements ProductDao {
     }
 
     @Override
+    public Page<Product> selectPublishedProductsByStore(int page, int size, Long storeId) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        return productRepository.findByStoreIdAndActiveTrueAndPublishedTrue(storeId, pageable);
+    }
+
+    @Override
     public Page<Product> selectAllProducts(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return productRepository.findAll(pageable);
+        return productRepository.findAllByActiveTrue(pageable);
     }
 
     public Page<Product> findProductsByCategoryByStore(String category, int page, int size, Long storeId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return productRepository.findByStoreIdAndCategory(storeId, category, pageable);
+        return productRepository.findByStoreIdAndCategoryAndActiveTrue(storeId, category, pageable);
+    }
+
+    @Override
+    public Page<Product> findPublishedProductsByCategoryByStore(String category, int page, int size, Long storeId) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        return productRepository.findByStoreIdAndCategoryAndActiveTrueAndPublishedTrue(storeId, category, pageable);
     }
 
     public Page<Product> findProductsByCategory(String category, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return productRepository.findByCategory(category, pageable);
+        return productRepository.findByCategoryAndActiveTrue(category, pageable);
     }
 
     public Page<Product> findProductsByNameByStore(String query, int page, int size, Long storeId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return productRepository.findByStoreIdAndNameContainingIgnoreCase(storeId, query, pageable);
+        return productRepository.findByStoreIdAndNameContainingIgnoreCaseAndActiveTrue(storeId, query, pageable);
+    }
+
+    @Override
+    public Page<Product> findPublishedProductsByNameByStore(String query, int page, int size, Long storeId) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
+        return productRepository.findByStoreIdAndNameContainingIgnoreCaseAndActiveTrueAndPublishedTrue(storeId, query, pageable);
     }
 
     public Page<Product> findProductsByName(String query, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
-        return productRepository.findByNameContainingIgnoreCase(query, pageable);
+        return productRepository.findByNameContainingIgnoreCaseAndActiveTrue(query, pageable);
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public Optional<Product> selectProductById(Integer productId) {
-        return productRepository.findById(productId);
+        return productRepository.findByIdAndActiveTrue(productId);
     }
 
     @Override
     public Optional<Product> selectProductByIdAndStore(Integer productId, Long storeId) {
+        return productRepository.findByIdAndStoreIdAndActiveTrue(productId, storeId);
+    }
+
+    @Override
+    public Optional<Product> selectPublishedProductByIdAndStore(Integer productId, Long storeId) {
+        return productRepository.findByIdAndStoreIdAndActiveTrueAndPublishedTrue(productId, storeId);
+    }
+
+    @Override
+    public Optional<Product> selectProductForImageByIdAndStore(Integer productId, Long storeId) {
         return productRepository.findByIdAndStoreId(productId, storeId);
     }
 
@@ -73,23 +101,8 @@ public class ProductJPADataAccessService implements ProductDao {
     }
 
     @Override
-    public boolean existsSaleItemByProductId(Integer productId) {
-        return productRepository.existsSaleItemByProductId(productId);
-    }
-
-    @Override
     public boolean existsSaleItemByVariationId(Integer variationId) {
         return productRepository.existsSaleItemByVariationId(variationId);
-    }
-
-    @Override
-    public boolean existsHistoryByProductId(Integer productId) {
-        return productRepository.existsHistoryByProductId(productId);
-    }
-
-    @Override
-    public void deleteProductById(Integer productId) {
-        productRepository.deleteById(productId);
     }
 
     @Override
@@ -115,6 +128,16 @@ public class ProductJPADataAccessService implements ProductDao {
     @Override
     public void deleteProductImage(Integer productId, String imageId) {
         productRepository.deleteProductImage(productId, imageId);
+    }
+
+    @Override
+    public long countPublishedProductsByStore(Long storeId) {
+        return productRepository.countByStoreIdAndActiveTrueAndPublishedTrue(storeId);
+    }
+
+    @Override
+    public void unpublishAllProductsByStore(Long storeId) {
+        productRepository.unpublishAllByStoreId(storeId);
     }
 
 }

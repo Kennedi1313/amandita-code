@@ -13,6 +13,7 @@ import com.amandita.store.StoreRepository;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 
@@ -20,6 +21,7 @@ import java.sql.Timestamp;
 
 @SpringBootApplication
 @EnableJpaRepositories
+@EnableScheduling
 public class Main {
 
     public static void main(String[] args) {

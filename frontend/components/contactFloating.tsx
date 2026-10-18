@@ -1,8 +1,15 @@
 import useStoreInfo from "@/hooks/use-store-info";
-import { BsArrowUpCircle, BsInstagram, BsWhatsapp } from "react-icons/bs";
+import { useRouter } from "next/router";
+import { BsInstagram, BsWhatsapp } from "react-icons/bs";
 
 export default function ContactFloating() {
   const storeInfo = useStoreInfo();
+  const router = useRouter();
+
+  if (router.pathname === "/checkout") {
+    return null;
+  }
+
   return (
     <div>
       <a

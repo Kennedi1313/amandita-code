@@ -9,6 +9,8 @@ public class SaleRequest {
     private String paymentMethod;
     private BigDecimal shippingFee;
     private String shippingMethod;
+    private String shippingZip;
+    private String shippingQuote;
 
     public List<SaleItemRequest> getSaleItemRequests() {
         return saleItemRequests;
@@ -49,4 +51,10 @@ public class SaleRequest {
     public void setShippingMethod(String shippingMethod) {
         this.shippingMethod = shippingMethod;
     }
+
+    public String getShippingZip() { return shippingZip; }
+
+    public void setShippingZip(String shippingZip) { this.shippingZip = shippingZip; }
+    public String getShippingQuote() { return shippingQuote; }
+    public void setShippingQuote(String shippingQuote) { this.shippingQuote = shippingQuote; }
 }

@@ -27,6 +27,14 @@ export const getSales = async () => {
   }
 };
 
+export const reconcileMercadoPagoSales = async () => {
+  return await axios.post(
+    `${getUrl()}/api/v1/payment/mercadopago/reconcile-pending`,
+    {},
+    getAuthConfig(),
+  );
+};
+
 export const updateSale = async (details) => {
   try {
     return await axios.post(`${getUrl()}/api/v1/products/sales`, details, {
@@ -35,6 +43,30 @@ export const updateSale = async (details) => {
   } catch (e) {
     throw e;
   }
+};
+
+export const createMelhorEnvioLabel = async (saleId) => {
+  return await axios.post(
+    `${getUrl()}/api/v1/melhorenvio/sales/${saleId}/label`,
+    {},
+    getAuthConfig(),
+  );
+};
+
+export const printMelhorEnvioLabel = async (saleId) => {
+  return await axios.post(
+    `${getUrl()}/api/v1/melhorenvio/sales/${saleId}/print`,
+    {},
+    getAuthConfig(),
+  );
+};
+
+export const refreshMelhorEnvioTracking = async (saleId) => {
+  return await axios.post(
+    `${getUrl()}/api/v1/melhorenvio/sales/${saleId}/tracking`,
+    {},
+    getAuthConfig(),
+  );
 };
 
 export const getProductsByCategory = async (category, currentPage) => {
@@ -146,6 +178,19 @@ export const deleteProduct = async (id) => {
     throw e;
   }
 };
+
+export const setProductPublished = async (id, published) => {
+  try {
+    return await axios.put(
+      `${getUrl()}/api/v1/products/${id}/publication`,
+      { published },
+      getAuthConfig(),
+    );
+  } catch (e) {
+    throw e;
+  }
+};
+
 export const uploadProductPicture = async (id, formData) => {
   try {
     return axios.post(

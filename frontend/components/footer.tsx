@@ -63,7 +63,7 @@ export default function Footer() {
           Copyright © 2024. Todos os direitos reservados.
         </div>
         <div className="flex flex-col">
-          <div>MOSTRA DIGITAL - CNPJ: 53.484.412/0001-00 - @mostra.digital</div>
+          <div>KIZI - CNPJ: 53.484.412/0001-00 - @mostra.digital</div>
         </div>
       </div>
     </div>

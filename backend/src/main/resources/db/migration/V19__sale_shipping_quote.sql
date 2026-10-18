@@ -1,0 +1,1 @@
+ALTER TABLE sale ADD COLUMN IF NOT EXISTS shipping_quote TEXT;

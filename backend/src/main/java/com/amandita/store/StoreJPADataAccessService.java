@@ -3,6 +3,8 @@ package com.amandita.store;
 import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
+import java.util.List;
+import java.time.OffsetDateTime;
 
 @Repository
 public class StoreJPADataAccessService implements StoreDao {
@@ -32,5 +34,24 @@ public class StoreJPADataAccessService implements StoreDao {
         return this.storeRepository.findById(id);
     }
 
+    @Override
+    public Optional<Store> findByIdForUpdate(Long id) {
+        return this.storeRepository.findByIdForUpdate(id);
+    }
+
+    @Override
+    public Optional<Store> findByMpSubscriptionId(String subscriptionId) {
+        return this.storeRepository.findByMpSubscriptionId(subscriptionId);
+    }
+
+    @Override
+    public List<Store> findByMpSubscriptionIdIsNotNull() {
+        return this.storeRepository.findByMpSubscriptionIdIsNotNull();
+    }
+
+    @Override
+    public List<Store> findExpiredSubscriptions(OffsetDateTime now) {
+        return this.storeRepository.findExpiredSubscriptions(StorePlan.COMPLETE, now);
+    }
 
 }

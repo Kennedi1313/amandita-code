@@ -16,6 +16,10 @@ export default function Search() {
   const query = router.query.name as string;
 
   useEffect(() => {
+    setCurrentPage(0);
+  }, [query, setCurrentPage]);
+
+  useEffect(() => {
     fetchProducts();
   }, [currentPage, query]);
 

@@ -56,7 +56,7 @@ const Customer = () => {
           thickness="4px"
           speed="0.65s"
           emptyColor="gray.200"
-          color="purple.500"
+          color="brand.500"
           size="xl"
         />
       </SidebarWithHeader>
@@ -65,7 +65,7 @@ const Customer = () => {
 
   return (
     <SidebarWithHeader>
-      <Box maxW="7xl" mx="auto" px={{ base: 2, md: 6 }} py={{ base: 4, md: 8 }}>
+      <Box maxW="7xl" mx="auto" px={{ base: 0, md: 6 }} py={{ base: 3, md: 8 }}>
         <PageHeader
           title="Clientes"
           description="Consulte contato, CPF e endereço dos compradores da loja."
@@ -83,10 +83,10 @@ const Customer = () => {
             borderColor="gray.100"
             borderRadius="md"
             bg="white"
-            p={{ base: 6, md: 10 }}
+            p={{ base: 4, md: 10 }}
             textAlign="center"
           >
-            <Icon as={FiUser} boxSize={10} color="#5f5482" />
+            <Icon as={FiUser} boxSize={10} color="#1f633c" />
             <Text mt={3} fontWeight="bold" fontSize="xl">
               Nenhum cliente ainda
             </Text>

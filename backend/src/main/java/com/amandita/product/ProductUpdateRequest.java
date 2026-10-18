@@ -12,5 +12,9 @@ public record ProductUpdateRequest(
         String category,
         Integer promo,
         List<String> imagesToDelete,
-        List<ProductVariationDTO> variations
+        List<ProductVariationDTO> variations,
+        java.math.BigDecimal weightKg,
+        Integer widthCm,
+        Integer heightCm,
+        Integer lengthCm
 ) { }

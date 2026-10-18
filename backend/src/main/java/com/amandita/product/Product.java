@@ -3,8 +3,10 @@ package com.amandita.product;
 import com.amandita.store.Store;
 import jakarta.persistence.*;
 
+import java.util.LinkedHashSet;
 import java.util.HashSet;
 import java.util.Set;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "product")
@@ -46,6 +48,12 @@ public class Product {
     )
     private Integer quantity;
 
+    @Column(nullable = false)
+    private boolean active = true;
+
+    @Column(nullable = false)
+    private boolean published = true;
+
     @Column(
             nullable = false
     )
@@ -56,11 +64,17 @@ public class Product {
     )
     private String profileImageId;
     private Integer promo;
+    @Column(precision = 8, scale = 3)
+    private BigDecimal weightKg;
+    private Integer widthCm;
+    private Integer heightCm;
+    private Integer lengthCm;
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<ProductImage> images = new HashSet<>();
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private Set<ProductVariation> variations = new HashSet<>();
+    @OrderBy("displayOrder ASC, id ASC")
+    private Set<ProductVariation> variations = new LinkedHashSet<>();
 
     @ManyToOne
     @JoinColumn(name = "store_id")
@@ -154,6 +168,22 @@ public class Product {
         this.quantity = quantity;
     }
 
+    public boolean isActive() {
+        return active;
+    }
+
+    public void setActive(boolean active) {
+        this.active = active;
+    }
+
+    public boolean isPublished() {
+        return published;
+    }
+
+    public void setPublished(boolean published) {
+        this.published = published;
+    }
+
     public String getCategory() {
         return category;
     }
@@ -177,6 +207,15 @@ public class Product {
     public void setPromo(Integer promo) {
         this.promo = promo;
     }
+
+    public BigDecimal getWeightKg() { return weightKg; }
+    public void setWeightKg(BigDecimal weightKg) { this.weightKg = weightKg; }
+    public Integer getWidthCm() { return widthCm; }
+    public void setWidthCm(Integer widthCm) { this.widthCm = widthCm; }
+    public Integer getHeightCm() { return heightCm; }
+    public void setHeightCm(Integer heightCm) { this.heightCm = heightCm; }
+    public Integer getLengthCm() { return lengthCm; }
+    public void setLengthCm(Integer lengthCm) { this.lengthCm = lengthCm; }
 
 
     public Store getStore() {

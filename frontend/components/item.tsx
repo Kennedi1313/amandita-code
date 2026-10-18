@@ -91,20 +91,20 @@ export default function Item(props: ItemProps) {
     <div className="relative">
       <Link
         href={"/details/" + props.id}
-        className="flex flex-col gap-2 w-full h-[28rem] bg-white"
+        className="group flex h-full min-w-0 flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-2 shadow-sm transition hover:-translate-y-0.5 hover:border-gray-200 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900 sm:p-3"
       >
-        <div className="h-[20rem] w-full relative">
+        <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-[#f4f2ef]">
           <Image
             src={getProductImageUrl(props.id)}
             alt={props.name}
             quality={50}
-            className="bg-gray-100 object-cover"
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 50vw, 33vw"
           />
         </div>
-        <div className="flex flex-col justify-between overflow-hidden gap-2">
-          <span className="text-md leading-5 font-thin text-gray-800">
+        <div className="flex min-h-[4.5rem] flex-1 flex-col justify-between gap-2 px-1 pb-1">
+          <span className="line-clamp-2 text-sm font-medium leading-5 text-gray-800 sm:text-base">
             {props.name}
           </span>
           {priceText ? (
@@ -116,8 +116,10 @@ export default function Item(props: ItemProps) {
       </Link>
 
       <button
-        className="rounded-full absolute right-1 top-2 border-[1px] border-gray-200 flex flex-row text-black
-            bg-white opacity-80 justify-center items-center p-3"
+        type="button"
+        aria-label={`${isInFavorites() ? "Remover dos favoritos" : "Adicionar aos favoritos"}: ${props.name}`}
+        aria-pressed={isInFavorites()}
+        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-rose-400 shadow-sm backdrop-blur transition hover:scale-105 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
         disabled={adding}
         onClick={() => {
           isInFavorites()
@@ -160,10 +162,9 @@ export default function Item(props: ItemProps) {
               `Olá, tudo bem? Gostaria de ser avisado quando este produto chegar em estoque: https://${storeInfo.domain}/details/${props.id}`,
             )}`
           }
-          target="blank"
-          className="rounded-md flex flex-row text-white 
-                    bg-green-whatsapp gap-2 justify-center items-center py-2 px-4
-                    absolute left-[3%] w-[94%] md:h-10 bottom-[30%]"
+          target="_blank"
+          rel="noreferrer"
+          className="absolute inset-x-3 bottom-3 flex min-h-10 items-center justify-center gap-2 rounded-xl bg-green-whatsapp px-3 py-2 text-white shadow-sm transition hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
         >
           <BsWhatsapp className="w-5 h-5"></BsWhatsapp>
           <span className="font-bold text-[14px]">Me avise quando chegar</span>

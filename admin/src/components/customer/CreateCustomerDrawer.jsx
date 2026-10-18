@@ -18,7 +18,7 @@ const CreateCustomerDrawer = ({ fetchCustomers }) => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   return (
     <>
-      <Button leftIcon={<AddIcon />} colorScheme={"teal"} onClick={onOpen}>
+      <Button leftIcon={<AddIcon />} colorScheme={"brand"} onClick={onOpen}>
         Create customer
       </Button>
       <Drawer isOpen={isOpen} onClose={onClose} size={"xl"}>
@@ -34,7 +34,7 @@ const CreateCustomerDrawer = ({ fetchCustomers }) => {
           <DrawerFooter>
             <Button
               leftIcon={<CloseIcon />}
-              colorScheme={"teal"}
+              colorScheme={"brand"}
               onClick={onClose}
             >
               Close

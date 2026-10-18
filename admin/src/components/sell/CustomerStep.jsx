@@ -122,7 +122,7 @@ const CustomerStep = ({ setStep, onCustomerSelected, initialCustomer }) => {
         <Button
           onClick={handleSearchCustomer}
           isLoading={loading}
-          colorScheme="blue"
+          colorScheme="brand"
         >
           Buscar Cliente
         </Button>

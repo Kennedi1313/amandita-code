@@ -3,6 +3,8 @@ import { useRouter } from "next/router";
 import { toast } from "react-hot-toast";
 import { useShoppingFavorites } from "@/hooks/use-shopping-favorites";
 import {
+  BsFillHeartFill,
+  BsHeart,
   BsWhatsapp,
 } from "react-icons/bs";
 import Head from "next/head";
@@ -123,6 +125,16 @@ export default function Details(props: Product) {
     }
   };
 
+  const getContrastingColor = (hexColor: string) => {
+    if (!/^#[0-9A-Fa-f]{6}$/.test(hexColor || "")) return "#1F1D1B";
+    const channels = [1, 3, 5].map((offset) => {
+      const value = parseInt(hexColor.slice(offset, offset + 2), 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+    const luminance = 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    return luminance > 0.179 ? "#000000" : "#FFFFFF";
+  };
+
   const isInCart = () => {
     if (cartDetails) {
       return Object.keys(cartDetails).includes(cartKey);
@@ -133,7 +145,16 @@ export default function Details(props: Product) {
 
   const storeInfo = useStoreInfo();
   if (!storeInfo) return null;
-  const storeWhatsapp = String(storeInfo.whatsapp || "").replace(/\D/g, "");
+
+  const configuredHeaderBackgroundColor = storeInfo?.headerBackgroundColor || "";
+  const headerBackgroundColor = /^#[0-9A-Fa-f]{6}$/.test(configuredHeaderBackgroundColor)
+    ? configuredHeaderBackgroundColor
+    : "#FFFFFF";
+  const headerForegroundColor = getContrastingColor(headerBackgroundColor);
+  const whatsappDigits = String(storeInfo.whatsapp || "").replace(/\D/g, "");
+  const storeWhatsapp = whatsappDigits.startsWith("55")
+    ? whatsappDigits
+    : `55${whatsappDigits}`;
   const productUrl = `https://${storeInfo.domain}/details/${props.id}`;
   const stockMessage = encodeURIComponent(
     `Olá, tudo bem? Gostaria de ser avisado quando este produto chegar em estoque: ${props.name} - ${productUrl}`,
@@ -255,7 +276,8 @@ export default function Details(props: Product) {
             <p className="text-gray-500">Descrição:</p>
             <p className="whitespace-pre-line">{props.description}</p>
           </div>
-          <div className="flex flex-col w-full cursor-pointer">
+          <div
+            className="flex flex-row w-full cursor-pointer gap-2 items-center justify-center mt-4">
             {!hasStock ? (
               <a
                 href={
@@ -263,10 +285,9 @@ export default function Details(props: Product) {
                     ? `https://api.whatsapp.com/send?phone=55${storeWhatsapp}&text=${stockMessage}`
                     : "#"
                 }
-                target="blank"
+                target="_blank"
                 aria-disabled={!storeWhatsapp}
-                className="rounded-md flex flex-row text-white 
-                                    bg-green-whatsapp gap-2 justify-center items-center p-2 h-12 mt-2 w-full aria-disabled:opacity-50"
+                className="rounded-md flex flex-row text-white bg-green-whatsapp gap-2 justify-center items-center p-2 h-12 mt-2 w-full aria-disabled:opacity-50"
               >
                 <BsWhatsapp className="w-5 h-5"></BsWhatsapp>
                 <span className="font-bold text-[14px]">
@@ -276,8 +297,8 @@ export default function Details(props: Product) {
             ) : (
               <button
                 type="button"
-                className="rounded-md flex flex-row text-white 
-                                    bg-brown-1000 gap-2 justify-center items-center p-2 h-12 mt-2 w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: headerBackgroundColor, color: headerForegroundColor }} 
+                className="rounded-md border flex flex-row text-white font-bold bg-brand gap-2 justify-center items-center p-2 h-12 mt-2 w-full disabled:opacity-50 disabled:cursor-not-allowed border-black"
                 disabled={reachedStockLimit && !isInCart()}
                 onClick={() => {
                   isInCart()
@@ -307,8 +328,7 @@ export default function Details(props: Product) {
               </button>
             )}
             <div
-              className="rounded-md border-[1px] border-rose-400 flex flex-row text-white 
-                                    bg-rose-400 gap-2 justify-center items-center p-2 h-12 mt-2 w-full"
+              className="rounded-md flex border border-rose-400 flex-row gap-2 justify-center items-center p-0 h-12 mt-2 w-16"
               onClick={() => {
                 isInFavorites()
                   ? removeItemFavorites(props)
@@ -316,15 +336,9 @@ export default function Details(props: Product) {
               }}
             >
               {isInFavorites() ? (
-                <>
-                  <FiHeart className="w-5 h-5 text-white"></FiHeart> Remover dos
-                  favoritos
-                </>
+                <BsFillHeartFill className="w-[1.6rem] h-[1.6rem] text-rose-400 font-bold"></BsFillHeartFill>
               ) : (
-                <>
-                  <FiHeart className="w-5 h-5 opacity-100 text-white"></FiHeart>{" "}
-                  Adicionar aos favoritos
-                </>
+                <BsHeart className="w-[1.6rem] h-[1.6rem] text-rose-400 font-bold"></BsHeart>
               )}
             </div>
           </div>

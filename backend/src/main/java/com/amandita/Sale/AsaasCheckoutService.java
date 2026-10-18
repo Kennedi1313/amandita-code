@@ -8,6 +8,8 @@ import com.amandita.product.ProductDao;
 import com.amandita.product.ProductVariation;
 import com.amandita.store.Store;
 import com.amandita.store.StoreDao;
+import com.amandita.store.StorePlan;
+import com.amandita.store.LocalDeliveryService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.transaction.Transactional;
@@ -34,6 +36,7 @@ public class AsaasCheckoutService {
     private final SaleDao saleDao;
     private final CustomerDao customerDao;
     private final StoreDao storeDao;
+    private final LocalDeliveryService localDeliveryService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient;
     private final String asaasBaseUrl;
@@ -45,6 +48,7 @@ public class AsaasCheckoutService {
                                 SaleDao saleDao,
                                 CustomerDao customerDao,
                                 StoreDao storeDao,
+                                LocalDeliveryService localDeliveryService,
                                 ObjectMapper objectMapper,
                                 @Value("${asaas.base-url}") String asaasBaseUrl,
                                 @Value("${asaas.api-key}") String asaasApiKey,
@@ -54,6 +58,7 @@ public class AsaasCheckoutService {
         this.saleDao = saleDao;
         this.customerDao = customerDao;
         this.storeDao = storeDao;
+        this.localDeliveryService = localDeliveryService;
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newHttpClient();
         this.asaasBaseUrl = asaasBaseUrl.replaceAll("/+$", "");
@@ -71,22 +76,16 @@ public class AsaasCheckoutService {
         if (StringUtils.isBlank(asaasWebhookToken)) {
             throw new IllegalStateException("ASAAS_WEBHOOK_TOKEN não configurado.");
         }
-        if (request == null || request.saleRequest() == null || request.saleRequest().getSaleItemRequests() == null
-                || request.saleRequest().getSaleItemRequests().isEmpty()) {
-            throw new IllegalArgumentException("Carrinho vazio.");
+        if (request == null || request.saleRequest() == null) throw new IllegalArgumentException("Carrinho vazio.");
+        Store store = storeDao.findById(storeId).orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
+        if (store.getPlan() != StorePlan.COMPLETE) {
+            throw new IllegalStateException("O plano Grátis aceita pedidos pelo WhatsApp, sem checkout online.");
         }
-
-        Store store = storeDao.findById(storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
-        if (!StringUtils.equalsIgnoreCase(authenticatedEmail, request.saleRequest().getCustomerEmail())) {
-            throw new IllegalArgumentException("Cliente autenticado não corresponde ao pedido.");
+        if (StringUtils.isBlank(store.getAsaasWalletId())) {
+            throw new IllegalStateException("Esta loja ainda não configurou os recebimentos Asaas.");
         }
-        Customer customer = customerDao
-                .selectUserByEmailByStore(authenticatedEmail, storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado."));
-
-        Sale sale = buildPendingSale(request.saleRequest(), customer, store);
-        saleDao.insertSale(sale);
+        Sale sale = createPendingSaleForProvider(request.saleRequest(), storeId, authenticatedEmail, "ASAAS");
+        Customer customer = sale.getCustomer();
 
         String asaasCustomerId = createOrGetCustomer(customer);
         Map<String, Object> payload = buildAsaasPayload(request, sale, customer, store, asaasCustomerId);
@@ -120,6 +119,23 @@ public class AsaasCheckoutService {
                 checkoutId,
                 checkoutBaseUrl() + "/checkoutSession/show?id=" + checkoutId
         );
+    }
+
+    @Transactional(rollbackOn = Exception.class)
+    public Sale createPendingSaleForProvider(SaleRequest saleRequest, Long storeId, String authenticatedEmail,
+                                            String provider) {
+        if (saleRequest == null || saleRequest.getSaleItemRequests() == null || saleRequest.getSaleItemRequests().isEmpty()) {
+            throw new IllegalArgumentException("Carrinho vazio.");
+        }
+        if (!StringUtils.equalsIgnoreCase(authenticatedEmail, saleRequest.getCustomerEmail())) {
+            throw new IllegalArgumentException("Cliente autenticado não corresponde ao pedido.");
+        }
+        Store store = storeDao.findById(storeId)
+                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
+        Customer customer = customerDao.selectUserByEmailByStore(authenticatedEmail, storeId)
+                .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado."));
+        Sale sale = buildPendingSale(saleRequest, customer, store, provider);
+        return saleDao.insertSale(sale);
     }
 
     @Transactional
@@ -169,14 +185,21 @@ public class AsaasCheckoutService {
         }
     }
 
-    private Sale buildPendingSale(SaleRequest saleRequest, Customer customer, Store store) {
+    private Sale buildPendingSale(SaleRequest saleRequest, Customer customer, Store store, String provider) {
         Sale sale = new Sale();
         List<SaleItem> saleItems = new ArrayList<>();
         int subtotalInCents = 0;
 
         for (SaleItemRequest itemRequest : saleRequest.getSaleItemRequests()) {
+            if (itemRequest == null || itemRequest.getProductId() == null
+                    || itemRequest.getQuantity() == null || itemRequest.getQuantity() <= 0) {
+                throw new IllegalArgumentException("Revise os produtos e quantidades do carrinho.");
+            }
             Product product = productDao.selectProductByIdAndStore(itemRequest.getProductId(), store.getId())
                     .orElseThrow(() -> new IllegalArgumentException("Produto não encontrado: " + itemRequest.getProductId()));
+            if (!product.isPublished()) {
+                throw new IllegalArgumentException("Este produto não está publicado para venda.");
+            }
 
             ProductVariation variation = null;
             int unitPrice = product.getPrice();
@@ -207,14 +230,30 @@ public class AsaasCheckoutService {
             subtotalInCents += finalUnitPrice * itemRequest.getQuantity();
         }
 
+        if ("local_delivery".equals(saleRequest.getShippingMethod())) {
+            String requestedZip = saleRequest.getShippingZip() == null ? "" : saleRequest.getShippingZip().replaceAll("\\D", "");
+            boolean belongsToCustomer = customer.getAddresses() != null && customer.getAddresses().stream()
+                    .anyMatch(saved -> saved.getZip() != null && requestedZip.equals(saved.getZip().replaceAll("\\D", "")));
+            if (!belongsToCustomer) {
+                throw new IllegalArgumentException("O CEP de entrega deve corresponder a um endereço salvo na sua conta.");
+            }
+        }
+
         int shippingFee = resolveShippingFee(saleRequest, store, subtotalInCents);
         int totalInCents = subtotalInCents + shippingFee;
 
-        sale.setTotalPrice(totalInCents / 100.0);
+        // Sale totals are stored in integer cents, matching product and sale-item prices.
+        sale.setTotalPrice((double) totalInCents);
         sale.setSaleItems(saleItems);
         sale.setCustomer(customer);
-        sale.setShipment(shippingFee > 0);
-        sale.setPaymentMethod("ASAAS");
+        String chosenMethod = StringUtils.defaultIfBlank(saleRequest.getShippingMethod(), inferShippingMethod(
+                saleRequest.getShippingFee() == null ? 0 : saleRequest.getShippingFee().intValue(), store));
+        sale.setShipment("local_delivery".equals(chosenMethod) || chosenMethod.startsWith("melhor_envio:"));
+        sale.setShippingMethod(chosenMethod);
+        sale.setShippingFee(shippingFee);
+        sale.setShippingZip(saleRequest.getShippingZip());
+        sale.setShippingQuote(saleRequest.getShippingQuote());
+        sale.setPaymentMethod(provider);
         sale.setStore(store);
         sale.setStatus("PENDENTE");
         return sale;
@@ -230,7 +269,22 @@ public class AsaasCheckoutService {
             if (Boolean.FALSE.equals(store.getPickupEnabled())) {
                 throw new IllegalArgumentException("Retirada não está disponível para esta loja.");
             }
+            var address = store.getPickupAddress();
+            if (address == null || StringUtils.isAnyBlank(address.zip(), address.street(), address.number(),
+                    address.district(), address.city())) {
+                throw new IllegalArgumentException("A loja ainda não configurou o endereço para retirada.");
+            }
             return 0;
+        }
+
+        if (shippingMethod.startsWith("melhor_envio:")) {
+            if (store.getPlan() != StorePlan.COMPLETE || StringUtils.isBlank(store.getMelhorEnvioAccessToken())) {
+                throw new IllegalArgumentException("O Melhor Envio não está disponível para esta loja.");
+            }
+            if (StringUtils.isBlank(saleRequest.getShippingZip())) {
+                throw new IllegalArgumentException("Informe um endereço de entrega para calcular o frete.");
+            }
+            return requestedFee;
         }
 
         if (!"local_delivery".equals(shippingMethod)) {
@@ -240,11 +294,16 @@ public class AsaasCheckoutService {
             throw new IllegalArgumentException("Entrega local não está disponível para esta loja.");
         }
 
-        int freeShippingMinAmount = store.getFreeShippingMinAmount() == null ? 0 : store.getFreeShippingMinAmount();
-        if (freeShippingMinAmount > 0 && subtotalInCents >= freeShippingMinAmount) {
-            return 0;
+        try {
+            var quote = localDeliveryService.quote(store, saleRequest.getShippingZip(), subtotalInCents);
+            if (!quote.available() || quote.fee() == null) {
+                throw new IllegalArgumentException(StringUtils.defaultIfBlank(quote.message(), "Este endereço está fora da área de entrega da loja."));
+            }
+            return quote.fee();
+        } catch (IOException | InterruptedException exception) {
+            if (exception instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw new IllegalArgumentException("Não foi possível calcular a entrega agora. Tente novamente.");
         }
-        return Math.max(store.getLocalDeliveryFee() == null ? 0 : store.getLocalDeliveryFee(), 0);
     }
 
     private String inferShippingMethod(int requestedFee, Store store) {
@@ -274,6 +333,12 @@ public class AsaasCheckoutService {
         payload.put("items", buildItems(sale));
         payload.put("installment", Map.of("maxInstallmentCount", 6));
         payload.put("customer", asaasCustomerId);
+        if (StringUtils.isNotBlank(store.getAsaasWalletId())) {
+            payload.put("splits", List.of(Map.of(
+                    "walletId", store.getAsaasWalletId(),
+                    "percentualValue", 100
+            )));
+        }
         return payload;
     }
 
@@ -315,7 +380,7 @@ public class AsaasCheckoutService {
 
             items.add(Map.of(
                     "name", name,
-                    "description", StringUtils.defaultIfBlank(saleItem.getProduct().getDescription(), name),
+                    "description", truncate(StringUtils.defaultIfBlank(saleItem.getProduct().getDescription(), name), 150),
                     "quantity", saleItem.getQuantity(),
                     "value", centsToReais(saleItem.getPrice())
             ));
@@ -324,7 +389,6 @@ public class AsaasCheckoutService {
                 .mapToInt(item -> item.getPrice() * item.getQuantity())
                 .sum();
         int totalInCents = BigDecimal.valueOf(sale.getTotalPrice())
-                .multiply(BigDecimal.valueOf(100))
                 .setScale(0, RoundingMode.HALF_UP)
                 .intValue();
         int shippingInCents = totalInCents - itemSubtotal;
@@ -337,6 +401,13 @@ public class AsaasCheckoutService {
             ));
         }
         return items;
+    }
+
+    private String truncate(String value, int maxLength) {
+        if (value == null || value.length() <= maxLength) {
+            return value;
+        }
+        return value.substring(0, maxLength);
     }
 
     private Map<String, Object> buildCustomerData(Customer customer) {
@@ -357,6 +428,7 @@ public class AsaasCheckoutService {
     }
 
     private void decrementStock(Sale sale) {
+        if (sale.isStockDecremented()) return;
         for (SaleItem saleItem : sale.getSaleItems()) {
             if (saleItem.getVariation() != null) {
                 ProductVariation variation = saleItem.getVariation();
@@ -368,6 +440,7 @@ public class AsaasCheckoutService {
                 productDao.updateProduct(product);
             }
         }
+        sale.setStockDecremented(true);
     }
 
     private int applyPromo(int price, Integer promo) {

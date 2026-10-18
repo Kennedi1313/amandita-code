@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import { FiSearch, FiX } from "react-icons/fi";
 
-export default function SearchBar() {
+export default function SearchBar({ iconColor = "currentColor" }: { iconColor?: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const mobileInputRef = useRef<HTMLInputElement>(null);
@@ -36,7 +36,8 @@ export default function SearchBar() {
     <>
       <button
         type="button"
-        className="md:hidden flex h-10 w-10 items-center justify-center rounded-full text-gray-950 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black"
+        className="md:hidden flex h-10 w-10 items-center justify-center rounded-full transition hover:bg-black/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-current"
+        style={{ color: iconColor }}
         aria-label="Abrir busca"
         aria-expanded={isMobileSearchOpen}
         onClick={() => setIsMobileSearchOpen(true)}
@@ -87,20 +88,22 @@ export default function SearchBar() {
         onSubmit={handleSearch}
         className="hidden md:fixed md:left-0 md:top-4 md:z-50 md:flex md:h-12 md:w-1/3 md:items-center md:bg-transparent md:px-10 md:text-gray-500"
       >
-        <div className="flex w-full flex-row rounded-full border border-solid border-black">
+        <div className="flex w-full flex-row rounded-full border border-gray-200 bg-gray-50 transition focus-within:border-gray-400 focus-within:bg-white">
           <button
             type="submit"
-            className="flex h-10 w-10 shrink-0 items-center justify-center"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-600 transition hover:text-gray-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
             aria-label="Buscar"
           >
-            <FiSearch className="text-2xl font-bold text-black" />
+            <FiSearch className="text-xl" />
           </button>
         <input
           type="text"
           name="query"
           id="search"
           autoComplete="off"
-          className="min-w-0 flex-1 rounded-full py-1 pr-3 text-black outline-none"
+          aria-label="Buscar produtos"
+          placeholder="Buscar produtos"
+          className="min-w-0 flex-1 rounded-full bg-transparent py-1 pr-3 text-sm text-gray-900 outline-none placeholder:text-gray-400"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={handleKeyDown}

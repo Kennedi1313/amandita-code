@@ -1,0 +1,2 @@
+ALTER TABLE store
+    ADD COLUMN IF NOT EXISTS banner_mobile_url VARCHAR(255);

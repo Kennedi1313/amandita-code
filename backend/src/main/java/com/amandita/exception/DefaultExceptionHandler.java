@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -33,6 +34,19 @@ public class DefaultExceptionHandler {
     @ExceptionHandler(RequestValidationException.class)
     public ResponseEntity<ApiError> handleException(RequestValidationException e,
                                                     HttpServletRequest request) {
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                e.getMessage(),
+                HttpStatus.BAD_REQUEST.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiError> handleInvalidArgument(IllegalArgumentException e,
+                                                          HttpServletRequest request) {
         ApiError apiError = new ApiError(
                 request.getRequestURI(),
                 e.getMessage(),
@@ -88,6 +102,19 @@ public class DefaultExceptionHandler {
         ApiError apiError = new ApiError(
                 request.getRequestURI(),
                 e.getMessage(),
+                HttpStatus.UNAUTHORIZED.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(apiError, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(UsernameNotFoundException.class)
+    public ResponseEntity<ApiError> handleUnknownUser(UsernameNotFoundException e,
+                                                       HttpServletRequest request) {
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                "Email ou senha inválidos.",
                 HttpStatus.UNAUTHORIZED.value(),
                 LocalDateTime.now()
         );

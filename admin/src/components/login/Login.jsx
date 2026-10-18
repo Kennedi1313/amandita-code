@@ -19,9 +19,9 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useRef, useState } from "react";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const BRAND_PURPLE = "#5F5482";
-const BRAND_PURPLE_DARK = "#4d426d";
-const BRAND_PURPLE_LIGHT = "#75699b";
+const BRAND_GREEN = "#1f633c";
+const BRAND_GREEN_DARK = "#082f1e";
+const BRAND_GREEN_LIGHT = "#81c44c";
 
 const MyTextInput = ({ label, ...props }) => {
   // useField() returns [formik.getFieldProps(), formik.getFieldMeta()]
@@ -114,9 +114,7 @@ const LoginForm = () => {
           username: Yup.string()
             .email("Informe um email valido")
             .required("Email é obrigatório"),
-          password: Yup.string()
-            .max(20, "A senha não pode ter mais de 20 caracteres")
-            .required("Senha é obrigatória"),
+          password: Yup.string().required("Senha é obrigatória"),
         })}
         initialValues={{ username: "", password: "" }}
         onSubmit={(values, { setSubmitting }) => {
@@ -154,9 +152,9 @@ const LoginForm = () => {
 
               <Button
                 type={"submit"}
-                bg={BRAND_PURPLE}
+                bg={BRAND_GREEN}
                 color={"white"}
-                _hover={{ bg: BRAND_PURPLE_DARK }}
+                _hover={{ bg: BRAND_GREEN_DARK }}
                 disabled={!isValid || isSubmitting}
               >
                 Entrar
@@ -188,39 +186,103 @@ const Login = () => {
   }, [customer, navigate]);
 
   return (
-    <Stack
-      minH={"100vh"}
-      background={`linear-gradient(145deg, ${BRAND_PURPLE_DARK}, ${BRAND_PURPLE}, ${BRAND_PURPLE_LIGHT})`}
-      direction={{ base: "column", md: "row" }}
-    >
-      <Flex p={8} flex={1} alignItems={"center"} justifyContent={"center"}>
-        <Stack spacing={4} w={"full"} maxW={"md"}>
-          <Flex alignSelf="center" align="center" gap={3} color="white">
-            <Image
-              src="/icon_sem_fundo.png"
-              alt="Mostra Digital"
-              boxSize="56px"
-              objectFit="contain"
-            />
-            <Heading fontSize="2xl" fontWeight="semibold">
-              Mostra Digital
-            </Heading>
-          </Flex>
-          <Stack
-            backgroundColor={"rgba(255,255,255,0.98)"}
-            color={BRAND_PURPLE_DARK}
-            padding={"2rem"}
-            rounded={"2xl"}
-            boxShadow={"0 24px 70px rgba(25, 15, 40, 0.18)"}
+    <Flex minH="100vh" bg="white" direction={{ base: "column", lg: "row" }}>
+      <Flex
+        flex={{ base: "none", lg: "1" }}
+        minH={{ base: "210px", lg: "100vh" }}
+        p={{ base: 6, md: 10, lg: 14 }}
+        direction="column"
+        justify="space-between"
+        color="white"
+        bg={`linear-gradient(145deg, ${BRAND_GREEN_DARK}, ${BRAND_GREEN}, ${BRAND_GREEN_LIGHT})`}
+        position="relative"
+        overflow="hidden"
+        _after={{
+          content: '""',
+          position: "absolute",
+          width: "420px",
+          height: "420px",
+          borderRadius: "full",
+          border: "1px solid",
+          borderColor: "whiteAlpha.200",
+          right: "-180px",
+          bottom: "-200px",
+          boxShadow:
+            "0 0 0 40px rgba(255,255,255,0.04), 0 0 0 80px rgba(255,255,255,0.03)",
+        }}
+      >
+        <Flex align="center" gap={3} position="relative" zIndex={1}>
+          <Image
+            src="/brand-mark.png"
+            alt="KIZI"
+            boxSize="65px"
+            objectFit="contain"
+            rounded="full"
+          />
+          <Heading fontSize="3xl" fontWeight="bold">
+            KIZI
+          </Heading>
+        </Flex>
+        <Stack
+          display={{ base: "none", lg: "flex" }}
+          spacing={5}
+          maxW="480px"
+          pb={10}
+          position="relative"
+          zIndex={1}
+        >
+          <Text
+            color="whiteAlpha.800"
+            fontSize="sm"
+            fontWeight="bold"
+            textTransform="uppercase"
+            letterSpacing="wider"
           >
-            <Heading fontSize={"2xl"} mb={15}>
-              Entrar na sua conta
-            </Heading>
-            <LoginForm />
-          </Stack>
+            Seu negócio, em movimento
+          </Text>
+          <Heading fontSize={{ lg: "4xl", xl: "5xl" }} lineHeight="1.08">
+            Tudo da sua loja em um só lugar.
+          </Heading>
+          <Text color="whiteAlpha.800" fontSize="lg" lineHeight="tall">
+            Acompanhe pedidos, organize seus produtos e cuide da sua operação
+            com mais clareza.
+          </Text>
         </Stack>
       </Flex>
-    </Stack>
+      <Flex
+        flex="1"
+        align="center"
+        justify="center"
+        p={{ base: 5, md: 10 }}
+        bg="gray.50"
+      >
+        <Stack spacing={6} w="full" maxW="md">
+          <Box
+            bg="white"
+            color="gray.800"
+            p={{ base: 6, md: 9 }}
+            rounded="2xl"
+            border="1px solid"
+            borderColor="gray.100"
+            boxShadow="0 24px 70px rgba(25, 15, 40, 0.08)"
+          >
+            <Text color="brand.600" fontSize="sm" fontWeight="semibold" mb={2}>
+              Bem-vindo de volta
+            </Text>
+            <Heading fontSize="2xl" mb={2}>
+              Acesse sua conta
+            </Heading>
+            <Text color="gray.500" fontSize="sm">
+              Entre para continuar gerenciando sua loja.
+            </Text>
+            <LoginForm />
+          </Box>
+          <Text color="gray.500" fontSize="xs" textAlign="center">
+            Acesso seguro para lojistas KIZI
+          </Text>
+        </Stack>
+      </Flex>
+    </Flex>
   );
 };
 

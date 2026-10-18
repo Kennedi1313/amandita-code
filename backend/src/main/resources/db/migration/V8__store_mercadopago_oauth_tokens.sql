@@ -1,0 +1,2 @@
+ALTER TABLE store ADD COLUMN IF NOT EXISTS mp_access_token TEXT;
+ALTER TABLE store ADD COLUMN IF NOT EXISTS mp_refresh_token TEXT;

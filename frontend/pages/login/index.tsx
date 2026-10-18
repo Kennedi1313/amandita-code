@@ -1,9 +1,6 @@
-import { Formik, Form, useField } from "formik";
-import * as Yup from "yup";
 import { useAuth } from "../../components/Context/authContext";
 import { toast } from "react-hot-toast";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Script from "next/script";
 
@@ -13,119 +10,10 @@ declare global {
   }
 }
 
-const safeRedirectPath = (redirect?: string | null) => {
-  if (!redirect || !redirect.startsWith("/") || redirect.startsWith("//")) {
-    return "/checkout";
-  }
-  return redirect;
-};
-
-const MyTextInput = ({ label, ...props }: any) => {
-  // useField() returns [formik.getFieldProps(), formik.getFieldMeta()]
-  // which we can spread on <input>. We can use field meta to show an error
-  // message if the field is invalid and it has been touched (i.e. visited)
-  const [field, meta] = useField(props);
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor={props.id || props.name}>{label}</label>
-      <input
-        className="border-solid border-[1px] border-gray-300 p-2 rounded-md"
-        {...field}
-        {...props}
-      />
-      {meta.touched && meta.error ? (
-        <span className="font-bold text-red-500">{meta.error}</span>
-      ) : null}
-    </div>
-  );
-};
-
-const LoginForm = () => {
-  const { login, loginWithGoogle } = useAuth();
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = safeRedirectPath(searchParams.get("redirect"));
-
-  const handleGoogleCredential = useCallback((credential: string) => {
-    loginWithGoogle(credential)
-      .then(() => {
-        router.push(redirectTo);
-      })
-      .catch((err: any) => {
-        console.log(err);
-        toast.error(
-          err.response?.data?.message ||
-            err.response?.data ||
-            "Não foi possível entrar com Google.",
-        );
-      });
-  }, [loginWithGoogle, redirectTo, router]);
-
-  return (
-    <Formik
-      validateOnMount={true}
-      validationSchema={Yup.object({
-        username: Yup.string()
-          .email("Email tem um formato inválido")
-          .required("Obrigatório"),
-        password: Yup.string().required("Obrigatório"),
-      })}
-      initialValues={{ username: "", password: "" }}
-      onSubmit={(values, { setSubmitting }) => {
-        setSubmitting(true);
-        login(values)
-          .then((res: any) => {
-            router.push(redirectTo);
-          })
-          .catch((err: any) => {
-            console.log(err);
-            toast.error(
-              "Usuário ou senha incorretos! Em caso de dúvida, entre em contato conosco pelo Whatsapp.",
-            );
-          })
-          .finally(() => {
-            setSubmitting(false);
-          });
-      }}
-    >
-      {({ isValid, isSubmitting }) => (
-        <Form className="flex">
-          <div className="flex flex-col gap-4 w-full m-auto">
-            <MyTextInput
-              label={"Email"}
-              name={"username"}
-              type={"email"}
-              placeholder={"exemplo@exemplo.com"}
-            />
-            <MyTextInput
-              label={"Senha"}
-              name={"password"}
-              type={"password"}
-              placeholder={"Digite sua senha"}
-            />
-
-            <button
-              className="rounded-md px-2 py-4 bg-black-1000 w-full text-white font-bold disabled:opacity-50"
-              type={"submit"}
-              disabled={!isValid || isSubmitting}
-            >
-              {isSubmitting ? "Entrando..." : "Entrar"}
-            </button>
-            <div className="flex items-center gap-3 py-2">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-sm text-gray-500">ou</span>
-              <div className="h-px flex-1 bg-gray-200" />
-            </div>
-            <GoogleLoginButton onCredential={handleGoogleCredential} />
-            <Link className="text-center font-semibold text-black-1000 underline" href={"/signup"}>
-              Criar minha conta
-            </Link>
-          </div>
-        </Form>
-      )}
-    </Formik>
-  );
-};
+const safeRedirectPath = (redirect?: string | null) =>
+  redirect && redirect.startsWith("/") && !redirect.startsWith("//")
+    ? redirect
+    : "/checkout";
 
 const GoogleLoginButton = ({
   onCredential,
@@ -135,39 +23,53 @@ const GoogleLoginButton = ({
   const buttonRef = useRef<HTMLDivElement | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-
   useEffect(() => {
-    if (!scriptReady || !googleClientId || !window.google || !buttonRef.current) {
-      return;
+    if (!googleClientId || !buttonRef.current) return;
+
+    let attempts = 0;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const renderGoogleButton = () => {
+      if (!buttonRef.current || !window.google || (!scriptReady && attempts < 1)) {
+        return false;
+      }
+
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response: any) => {
+          if (response?.credential) onCredential(response.credential);
+        },
+      });
+      buttonRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: "outline",
+        size: "large",
+        shape: "rectangular",
+        text: "signin_with",
+        width: buttonRef.current.offsetWidth || 320,
+        locale: "pt-BR",
+      });
+      return true;
+    };
+
+    if (!renderGoogleButton()) {
+      timer = setInterval(() => {
+        attempts += 1;
+        if (renderGoogleButton() || attempts >= 20) {
+          if (timer) clearInterval(timer);
+        }
+      }, 100);
     }
 
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: (response: any) => {
-        if (response?.credential) {
-          onCredential(response.credential);
-        }
-      },
-    });
-
-    window.google.accounts.id.renderButton(buttonRef.current, {
-      theme: "outline",
-      size: "large",
-      shape: "rectangular",
-      text: "signin_with",
-      width: buttonRef.current.offsetWidth || 320,
-      locale: "pt-BR",
-    });
+    return () => {
+      if (timer) clearInterval(timer);
+    };
   }, [googleClientId, onCredential, scriptReady]);
-
-  if (!googleClientId) {
+  if (!googleClientId)
     return (
-      <p className="rounded-md bg-gray-50 p-3 text-sm text-gray-500">
+      <p className="rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-500">
         Login com Google ainda não configurado nesta loja.
       </p>
     );
-  }
-
   return (
     <>
       <Script
@@ -175,40 +77,118 @@ const GoogleLoginButton = ({
         async
         defer
         onLoad={() => setScriptReady(true)}
+        onReady={() => setScriptReady(true)}
       />
-      <div ref={buttonRef} className="flex min-h-[44px] w-full justify-center" />
+      <div
+        ref={buttonRef}
+        className="flex min-h-[44px] w-full justify-center"
+      />
     </>
   );
 };
 
-const Login = () => {
+const LoginForm = () => {
+  const { loginWithGoogle } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { customer } = useAuth();
-
-  useEffect(() => {
-    if (customer) {
-      router.push(safeRedirectPath(searchParams.get("redirect")));
-    }
-  }, [customer, router, searchParams]);
-
+  const redirectTo = safeRedirectPath(searchParams.get("redirect"));
+  const handleGoogleCredential = useCallback(
+    (credential: string) => {
+      loginWithGoogle(credential)
+        .then((res: any) => {
+          const profile = res.data?.customerDTO;
+          const address = profile?.addresses?.[0];
+          const needsProfile =
+            !profile?.phone ||
+            !profile?.cpf ||
+            !address?.zip ||
+            !address?.street ||
+            !address?.number ||
+            !address?.district ||
+            !address?.city;
+          router.push(
+            needsProfile
+              ? `/account?redirect=${encodeURIComponent(redirectTo)}`
+              : redirectTo,
+          );
+        })
+        .catch((err: any) =>
+          toast.error(
+            err.response?.data?.message ||
+              err.response?.data ||
+              "Não foi possível entrar com Google.",
+          ),
+        );
+    },
+    [loginWithGoogle, redirectTo, router],
+  );
   return (
-    <div className="mt-20 md:mt-36 flex-col md:flex-row">
-      <div className="flex items-center justify-center px-3">
-        <div className="w-full max-w-md">
-          <div className="bg-white p-6 md:p-8 rounded-md mt-10 mx-2 border border-gray-100">
-            <p className="text-sm uppercase tracking-wide text-gray-500">
-              Sua conta
-            </p>
-            <h1 className="text-3xl font-bold mt-1">Entrar na loja</h1>
-            <p className="mt-2 mb-6 text-gray-600">
-              Acesse para finalizar compras, revisar seus dados e acompanhar pedidos.
-            </p>
-            <LoginForm />
+    <div className="flex w-full flex-col gap-4">
+      <GoogleLoginButton onCredential={handleGoogleCredential} />
+      <div className="flex items-start gap-3 rounded-xl bg-gray-50 p-4 text-left">
+        <span className="mt-0.5 text-lg" aria-hidden="true">
+          ✓
+        </span>
+        <p className="text-sm leading-5 text-gray-600">
+          Sua conta é criada automaticamente na primeira entrada. Depois você só
+          completa contato e endereço para finalizar.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const Login = () => {
+  return (
+    <main className="md:container xl:max-w-screen-xl mx-auto px-4 py-6 md:px-6 md:py-12 mt-16 md:mt-28 min-h-[70vh]">
+      <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div className="mx-auto grid w-full max-w-5xl items-center gap-8 md:grid-cols-[1fr_420px]">
+        <div className="hidden md:block">
+          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-gray-500">
+            Quase lá
+          </p>
+          <h1 className="max-w-xl text-4xl font-bold leading-tight text-gray-950">
+            Entre para continuar sua compra com tranquilidade.
+          </h1>
+          <p className="mt-4 max-w-lg text-lg leading-7 text-gray-600">
+            Um único acesso para salvar seus dados, acompanhar pedidos e voltar
+            ao carrinho quando quiser.
+          </p>
+          <div className="mt-8 space-y-4 text-gray-700">
+            {[
+              "Finalize pedidos sem repetir seus dados",
+              "Acompanhe seu histórico de compras",
+              "Tenha seus dados protegidos pelo Google",
+            ].map((benefit) => (
+              <div key={benefit} className="flex items-center gap-3">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-900 text-sm text-white">
+                  ✓
+                </span>
+                <span>{benefit}</span>
+              </div>
+            ))}
           </div>
+        </div>
+        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm md:p-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-gray-500">
+            Sua conta
+          </p>
+          <h2 className="mt-2 text-3xl font-bold tracking-tight text-gray-950">
+            Entrar ou criar conta
+          </h2>
+          <p className="mt-3 text-gray-600">
+            Use sua conta Google para continuar. Não precisa criar senha.
+          </p>
+          <div className="my-7 border-t border-gray-100" />
+          <LoginForm />
+          <p className="mt-6 text-center text-xs leading-5 text-gray-500">
+            Ao continuar, você concorda com os termos da loja. Seus dados são
+            usados apenas para processar e acompanhar seu pedido.
+          </p>
         </div>
       </div>
     </div>
+    </main>
   );
 };
 

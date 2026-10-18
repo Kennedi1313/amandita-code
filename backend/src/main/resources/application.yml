@@ -10,7 +10,7 @@ server:
     enabled: false
 
 cors:
-  allowed-origins: "*"
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
   allowed-methods: "*"
   allowed-headers: "*"
   exposed-headers: "*"
@@ -42,9 +42,35 @@ asaas:
   webhook-token: ${ASAAS_WEBHOOK_TOKEN:}
   return-base-url: ${ASAAS_RETURN_BASE_URL:}
 
+mercadopago:
+  public-key: ${MERCADOPAGO_PUBLIC_KEY:}
+  client-id: ${MERCADOPAGO_CLIENT_ID:}
+  client-secret: ${MERCADOPAGO_CLIENT_SECRET:}
+  token-encryption-key: ${MERCADOPAGO_TOKEN_ENCRYPTION_KEY:${JWT_SECRET}}
+  redirect-uri: ${MERCADOPAGO_REDIRECT_URI:${APP_PUBLIC_API_URL:http://localhost:8080}/api/v1/mercadopago/callback}
+  application-fee: ${MERCADOPAGO_APPLICATION_FEE:}
+  marketplace-fee: ${MERCADOPAGO_MARKETPLACE_FEE:}
+  webhook-secret: ${MERCADOPAGO_WEBHOOK_SECRET:}
+  webhook-url: ${MERCADOPAGO_WEBHOOK_URL:}
+  subscription-access-token: ${MERCADOPAGO_SUBSCRIPTION_ACCESS_TOKEN:}
+  subscription-webhook-secret: ${MERCADOPAGO_SUBSCRIPTION_WEBHOOK_SECRET:}
+  return-base-url: ${MERCADOPAGO_RETURN_BASE_URL:}
+  sandbox: ${MERCADOPAGO_SANDBOX:false}
+
 saas:
   base-domain: ${SAAS_BASE_DOMAIN:mostradigital.com.br}
   admin-url: ${SAAS_ADMIN_URL:https://admin.mostradigital.com.br}
+
+local-delivery:
+  geocoder-url: ${LOCAL_DELIVERY_GEOCODER_URL:https://cep.awesomeapi.com.br/json}
+  fallback-geocoder-url: ${LOCAL_DELIVERY_FALLBACK_GEOCODER_URL:https://brasilapi.com.br/api/cep/v2}
+
+melhor-envio:
+  client-id: ${MELHOR_ENVIO_CLIENT_ID:}
+  client-secret: ${MELHOR_ENVIO_CLIENT_SECRET:}
+  redirect-uri: ${MELHOR_ENVIO_REDIRECT_URI:${APP_PUBLIC_API_URL:http://localhost:8080}/api/v1/melhorenvio/callback}
+  environment: ${MELHOR_ENVIO_ENVIRONMENT:sandbox}
+  user-agent: ${MELHOR_ENVIO_USER_AGENT:Amandita (contato@amandita.com.br)}
 
 spring:
   datasource:

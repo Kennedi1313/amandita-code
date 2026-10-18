@@ -41,8 +41,8 @@ const Pagination = (props: Props) => {
   let lastPage = paginationRange[paginationRange.length - 1];
   return (
     <div className="flex flex-row gap-2 w-full items-center justify-center mt-8">
-      <a
-        href="#"
+      <button
+        type="button"
         className={
           currentPage === 0
             ? "pointer-events-none opacity-30 border-solid border-2 border-gray-500 p-2 rounded-md"
@@ -51,7 +51,7 @@ const Pagination = (props: Props) => {
         onClick={onPrevious}
       >
         <BsArrowLeft></BsArrowLeft>
-      </a>
+      </button>
       {paginationRange?.map((pageNumber: any) => {
         if (pageNumber === DOTS) {
           return (
@@ -62,8 +62,8 @@ const Pagination = (props: Props) => {
         }
 
         return (
-          <a
-            href="#"
+          <button
+            type="button"
             key={pageNumber}
             className={
               pageNumber === currentPage
@@ -73,11 +73,11 @@ const Pagination = (props: Props) => {
             onClick={() => onPageChange(pageNumber)}
           >
             {pageNumber + 1}
-          </a>
+          </button>
         );
       })}
-      <a
-        href="#"
+      <button
+        type="button"
         className={
           currentPage === lastPage
             ? "pointer-events-none opacity-30 border-solid border-2 border-gray-500 p-2 rounded-md"
@@ -86,7 +86,7 @@ const Pagination = (props: Props) => {
         onClick={onNext}
       >
         <BsArrowRight></BsArrowRight>
-      </a>
+      </button>
     </div>
   );
 };
