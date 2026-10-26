@@ -11,7 +11,10 @@ import com.amandita.store.Store;
 import com.amandita.store.StoreDao;
 import com.amandita.store.StorePlan;
 import com.amandita.store.StorePlanService;
+import com.amandita.store.Category;
+import com.amandita.store.CategoryRepository;
 import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 import net.coobird.thumbnailator.Thumbnails;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.NotNull;
@@ -35,7 +38,16 @@ public class ProductService {
     private final ProductDTOMapper productDTOMapper;
     private final S3Service s3Service;
     private final S3Buckets s3Buckets;
-    public ProductService(ProductDao productDao, SaleDao saleDao, CustomerDao customerDao, StoreDao storeDao, ProductDTOMapper productDTOMapper, S3Service s3Service, S3Buckets s3Buckets) {
+    private final CategoryRepository categoryRepository;
+    public ProductService(ProductDao productDao, SaleDao saleDao, CustomerDao customerDao,
+                           StoreDao storeDao, ProductDTOMapper productDTOMapper,
+                           S3Service s3Service, S3Buckets s3Buckets) {
+        this(productDao, saleDao, customerDao, storeDao, productDTOMapper,
+                s3Service, s3Buckets, null);
+    }
+
+    @Autowired
+    public ProductService(ProductDao productDao, SaleDao saleDao, CustomerDao customerDao, StoreDao storeDao, ProductDTOMapper productDTOMapper, S3Service s3Service, S3Buckets s3Buckets, CategoryRepository categoryRepository) {
         this.productDao = productDao;
         this.saleDao = saleDao;
         this.customerDao = customerDao;
@@ -43,6 +55,7 @@ public class ProductService {
         this.productDTOMapper = productDTOMapper;
         this.s3Service = s3Service;
         this.s3Buckets = s3Buckets;
+        this.categoryRepository = categoryRepository;
     }
 
     public Page<ProductDTO> getAllProducts(int page, int size) {
@@ -131,10 +144,16 @@ public class ProductService {
                 productRegistrationRequest.profileImageId(),
                 productRegistrationRequest.promo()
         );
-        product.setWeightKg(productRegistrationRequest.weightKg());
-        product.setWidthCm(productRegistrationRequest.widthCm());
-        product.setHeightCm(productRegistrationRequest.heightCm());
-        product.setLengthCm(productRegistrationRequest.lengthCm());
+        Category category = categoryRepository == null ? null : categoryRepository.findByStoreIdAndPath(storeId,
+                "/products/" + productRegistrationRequest.category()).orElse(null);
+        product.setWeightKg(productRegistrationRequest.weightKg() != null
+                ? productRegistrationRequest.weightKg() : category == null ? null : category.getWeightKg());
+        product.setWidthCm(productRegistrationRequest.widthCm() != null
+                ? productRegistrationRequest.widthCm() : category == null ? null : category.getWidthCm());
+        product.setHeightCm(productRegistrationRequest.heightCm() != null
+                ? productRegistrationRequest.heightCm() : category == null ? null : category.getHeightCm());
+        product.setLengthCm(productRegistrationRequest.lengthCm() != null
+                ? productRegistrationRequest.lengthCm() : category == null ? null : category.getLengthCm());
         product.setStore(store);
         product.setPublished(store.getPlan() == StorePlan.COMPLETE
                 || productDao.countPublishedProductsByStore(storeId) < StorePlanService.FREE_PUBLISHED_PRODUCT_LIMIT);
@@ -480,6 +499,9 @@ public class ProductService {
         sale.setShippingMethod(saleRequest.getShippingMethod());
         sale.setShippingFee(saleRequest.getShippingFee() == null ? 0 : saleRequest.getShippingFee().intValue());
         sale.setShippingZip(saleRequest.getShippingZip());
+        if (sale.getCustomer() != null && sale.getCustomer().getAddresses() != null) {
+            sale.getCustomer().getAddresses().stream().findFirst().ifPresent(sale::snapshotShippingAddress);
+        }
         sale.setShippingQuote(saleRequest.getShippingQuote());
         sale.setStore(store);
         saleDao.insertSale(sale);
@@ -506,6 +528,10 @@ public class ProductService {
     }
 
     public Sale updateSaleStatus(Long saleId, String status, Long storeId) {
+        return updateSaleStatus(saleId, status, null, storeId);
+    }
+
+    public Sale updateSaleStatus(Long saleId, String status, String trackingCode, Long storeId) {
         Set<String> allowedStatuses = Set.of(
                 "PENDENTE",
                 "APROVADO",
@@ -527,6 +553,9 @@ public class ProductService {
                 ));
 
         sale.setStatus(normalizedStatus);
+        if (StringUtils.isNotBlank(trackingCode)) {
+            sale.setExternalTrackingCode(StringUtils.trim(trackingCode));
+        }
         return saleDao.insertSale(sale);
     }
 

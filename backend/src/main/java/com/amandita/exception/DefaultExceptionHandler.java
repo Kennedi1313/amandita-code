@@ -57,6 +57,19 @@ public class DefaultExceptionHandler {
         return new ResponseEntity<>(apiError, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiError> handleIllegalState(IllegalStateException e,
+                                                        HttpServletRequest request) {
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                e.getMessage(),
+                HttpStatus.UNPROCESSABLE_ENTITY.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(apiError, HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
     @ExceptionHandler({DuplicateResourceException.class, ResourceConflictException.class})
     public ResponseEntity<ApiError> handleConflictException(RuntimeException e,
                                                            HttpServletRequest request) {

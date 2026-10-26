@@ -11,6 +11,8 @@ import {
   DrawerFooter,
   DrawerHeader,
   DrawerOverlay,
+  FormControl,
+  FormLabel,
   Flex,
   Grid,
   HStack,
@@ -22,6 +24,7 @@ import {
   Select,
   SimpleGrid,
   Spinner,
+  Switch,
   Stack,
   Table,
   TableContainer,
@@ -173,7 +176,10 @@ const getSaleAmounts = (sale) => {
 };
 
 const formatDate = (dateString) => {
-  const date = new Date(dateString);
+  const normalizedDate = dateString && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(dateString)
+    ? `${dateString}Z`
+    : dateString;
+  const date = new Date(normalizedDate);
   return !Number.isNaN(date.getTime())
     ? date.toLocaleDateString("pt-BR", {
         day: "2-digit",
@@ -181,6 +187,7 @@ const formatDate = (dateString) => {
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "America/Fortaleza",
       })
     : "Data inválida";
 };
@@ -256,6 +263,21 @@ const getOrderAction = (status) => {
   };
 };
 
+const statusTransitionCopy = {
+  PREPARANDO: {
+    title: "Iniciar preparação do pedido?",
+    description: "O pagamento está confirmado. Ao continuar, o pedido será marcado como em separação.",
+  },
+  ENVIADO: {
+    title: "Marcar pedido como enviado?",
+    description: "Use esta opção somente depois que o pedido sair da loja ou a etiqueta tiver sido entregue à transportadora.",
+  },
+  ENTREGUE: {
+    title: "Confirmar entrega do pedido?",
+    description: "Confirme apenas depois que o cliente receber o pedido ou concluir a retirada.",
+  },
+};
+
 const StatusBadge = ({ status }) => {
   const config = getStatusConfig(status);
   return (
@@ -294,6 +316,8 @@ const SalesDashboard = () => {
   const [generatingLabel, setGeneratingLabel] = useState(false);
   const [printingLabel, setPrintingLabel] = useState(false);
   const [refreshingTracking, setRefreshingTracking] = useState(false);
+  const [useInvoice, setUseInvoice] = useState(false);
+  const [invoiceKey, setInvoiceKey] = useState("");
   const [error, setError] = useState(null);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const saleDetailsDrawerSize = useBreakpointValue({ base: "full", md: "xl" });
@@ -483,10 +507,10 @@ const SalesDashboard = () => {
     onOpen();
   }
 
-  const changeStatus = async (saleId, status) => {
+  const changeStatus = async (saleId, status, trackingCode = "") => {
     setUpdatingStatus(true);
     try {
-      const response = await updateSale({ saleId, status });
+      const response = await updateSale({ saleId, status, trackingCode: trackingCode.trim() || null });
       setSelectedSale(response.data);
       await fetchSales();
       setError(null);
@@ -501,17 +525,21 @@ const SalesDashboard = () => {
     }
   };
 
-  const generateLabel = async (saleId) => {
+  const generateLabel = async (saleId, selectedInvoiceKey = "") => {
     setGeneratingLabel(true);
     try {
-      const response = await createMelhorEnvioLabel(saleId);
+      const response = await createMelhorEnvioLabel(saleId, selectedInvoiceKey);
       setSelectedSale(response.data);
       await fetchSales();
       successNotification("Etiqueta gerada", "A etiqueta do Melhor Envio foi gerada.");
     } catch (err) {
+      const responseData = err.response?.data;
+      const apiMessage = typeof responseData === "string"
+        ? responseData
+        : responseData?.message || responseData?.error;
       errorNotification(
         "Não foi possível gerar a etiqueta",
-        err.response?.data?.message || "Confira o endereço, a cotação e as dimensões dos produtos.",
+        apiMessage || "Confira o endereço, a cotação e as dimensões dos produtos.",
       );
     } finally {
       setGeneratingLabel(false);
@@ -545,18 +573,31 @@ const SalesDashboard = () => {
     }
   };
 
+  const saveExternalTracking = async (saleId, trackingCode) => {
+    try {
+      const response = await updateSale({ saleId, status: "ENVIADO", trackingCode: trackingCode.trim() || null });
+      setSelectedSale(response.data);
+      await fetchSales();
+      successNotification("Rastreio salvo", "O código de rastreio foi atualizado.");
+    } catch (err) {
+      errorNotification("Não foi possível salvar o rastreio", err.response?.data?.message || "Tente novamente.");
+    }
+  };
+
   const selectedItems = getSaleItems(selectedSale);
-  const selectedAddress = selectedSale?.customer?.addresses?.[0];
+  const selectedAddress = selectedSale?.shippingAddress;
   const selectedAmounts = getSaleAmounts(selectedSale);
   const selectedStatus = normalizeStatus(selectedSale?.status);
   const selectedAction = getOrderAction(selectedStatus);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isStatusDrawerOpen, setIsStatusDrawerOpen] = useState(false);
   const [pendingStatus, setPendingStatus] = useState(null);
+  const [externalTrackingCode, setExternalTrackingCode] = useState("");
   const [isGenerateLabelDrawerOpen, setIsGenerateLabelDrawerOpen] = useState(false);
 
   const handleRequestStatusChange = (saleId, newStatus) => {
     setPendingStatus(newStatus);
+    setExternalTrackingCode(selectedSale?.externalTrackingCode || selectedSale?.melhorEnvioTrackingCode || "");
     setIsStatusDrawerOpen(true);
   };
 
@@ -919,7 +960,11 @@ const SalesDashboard = () => {
                   onPrintLabel={printLabel}
                   isRefreshingTracking={refreshingTracking}
                   onRefreshTracking={refreshTracking}
+                  onSaveTracking={saveExternalTracking}
                 />
+                {normalizeStatus(selectedSale.status) === "ENVIADO" ? (
+                  <TrackingPanel sale={selectedSale} onSaveTracking={saveExternalTracking} />
+                ) : null}
 
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                   <InfoPanel title="Cliente" icon={FiUser}>
@@ -967,8 +1012,8 @@ const SalesDashboard = () => {
                     {selectedAddress ? (
                       <Text color="gray.600">
                         {selectedAddress.street}, {selectedAddress.number} -{" "}
-                        {selectedAddress.district}, {selectedAddress.city}/RN,{" "}
-                        {selectedAddress.zip}
+                        {selectedAddress.district}, {selectedAddress.city}/{selectedAddress.state || "--"},{" "}
+                        {selectedSale.shippingZip}
                       </Text>
                     ) : (
                       <Text color="gray.600">Sem endereço cadastrado</Text>
@@ -1122,49 +1167,85 @@ const SalesDashboard = () => {
         <DrawerContent zIndex={1401}>
           <DrawerCloseButton isDisabled={updatingStatus} />
 
-          <DrawerHeader>
-            Confirmar alteração de status
+          <DrawerHeader borderBottomWidth="1px" borderColor="gray.100" pb={4}>
+            <Flex align="center" gap={3} pr={8}>
+              <Flex
+                align="center"
+                justify="center"
+                boxSize="44px"
+                borderRadius="xl"
+                bg="brand.50"
+                color="brand.600"
+              >
+                <Icon as={FiPackage} boxSize={5} />
+              </Flex>
+              <Box>
+                <Text fontSize="lg" fontWeight="700">
+                  {statusTransitionCopy[pendingStatus]?.title || "Confirmar atualização do pedido"}
+                </Text>
+                <Text fontSize="sm" color="gray.500" fontWeight="normal">
+                  Pedido #{selectedSale?.id}
+                </Text>
+              </Box>
+            </Flex>
           </DrawerHeader>
 
           <DrawerBody>
             <Stack spacing={4}>
-              <Text color="gray.600">
-                Tem certeza de que deseja alterar o status deste pedido?
+              <Text color="gray.600" lineHeight="1.6">
+                {statusTransitionCopy[pendingStatus]?.description || "Revise a alteração antes de confirmar."}
               </Text>
 
-              <Box
-                p={4}
-                border="1px solid"
-                borderColor="gray.200"
-                borderRadius="md"
-              >
-                <Text fontSize="sm" color="gray.500">
-                  Número do pedido
-                </Text>
-
-                <Text fontWeight="bold" mb={3}>
-                  #{selectedSale?.id}
-                </Text>
-
-                <Text fontSize="sm" color="gray.500">
-                  Status atual
-                </Text>
-
-                <Box mb={3}>
-                  <StatusBadge status={selectedSale?.status} />
+              {pendingStatus === "ENVIADO" && selectedSale?.shippingMethod?.startsWith("melhor_envio:") && !selectedSale?.melhorEnvioShipmentId ? (
+                <Box p={4} borderWidth="1px" borderColor="orange.200" borderRadius="xl" bg="orange.50" color="orange.900">
+                  <Text fontWeight="700" mb={1}>Atenção antes de marcar como enviado</Text>
+                  <Text fontSize="sm">
+                    Este pedido usa Melhor Envio, mas ainda não tem etiqueta gerada pela Kizi. Gere a etiqueta no botão ao lado ou crie o envio diretamente no site do Melhor Envio e informe o código de rastreio depois.
+                  </Text>
                 </Box>
+              ) : null}
 
-                <Text fontSize="sm" color="gray.500">
-                  Novo status
-                </Text>
+              {pendingStatus === "ENVIADO" ? (
+                <FormControl>
+                  <FormLabel>Código de rastreio (opcional)</FormLabel>
+                  <Input
+                    value={externalTrackingCode}
+                    onChange={(event) => setExternalTrackingCode(event.target.value)}
+                    placeholder="Informe se a etiqueta foi gerada fora da Kizi"
+                  />
+                  <Text mt={1} fontSize="xs" color="gray.500">
+                    Você poderá preencher ou atualizar este código depois.
+                  </Text>
+                </FormControl>
+              ) : null}
 
-                <Text fontWeight="semibold">
-                  {<StatusBadge status={pendingStatus} /> || "Não selecionado"}
+              <Box
+                p={{ base: 4, md: 5 }}
+                borderWidth="1px"
+                borderColor="gray.200"
+                borderRadius="xl"
+                bg="gray.50"
+              >
+                <Text fontSize="xs" fontWeight="700" color="gray.500" textTransform="uppercase" letterSpacing="wide" mb={3}>
+                  Alteração do pedido
                 </Text>
+                <Stack direction={{ base: "column", sm: "row" }} align="stretch" spacing={3}>
+                  <Box flex="1" bg="white" borderWidth="1px" borderColor="gray.200" borderRadius="lg" p={3}>
+                    <Text fontSize="xs" color="gray.500" mb={2}>Status atual</Text>
+                    <StatusBadge status={selectedSale?.status} />
+                  </Box>
+                  <Flex align="center" justify="center" color="gray.400" fontSize="lg" transform={{ base: "rotate(90deg)", sm: "none" }}>
+                    →
+                  </Flex>
+                  <Box flex="1" bg="white" borderWidth="1px" borderColor="brand.200" borderRadius="lg" p={3}>
+                    <Text fontSize="xs" color="gray.500" mb={2}>Novo status</Text>
+                    <StatusBadge status={pendingStatus} />
+                  </Box>
+                </Stack>
               </Box>
 
-              <Text fontSize="sm" color="gray.500">
-                Confirme somente se deseja aplicar essa alteração ao pedido.
+              <Text fontSize="sm" color="gray.500" lineHeight="1.5">
+                Essa alteração ficará visível para a loja e para o cliente no histórico do pedido.
               </Text>
             </Stack>
           </DrawerBody>
@@ -1179,7 +1260,7 @@ const SalesDashboard = () => {
               }}
               isDisabled={updatingStatus}
             >
-              Manter status em {selectedSale?.status}
+              Cancelar
             </Button>
 
             <Button
@@ -1191,7 +1272,7 @@ const SalesDashboard = () => {
                 if (!pendingStatus || updatingStatus) return;
 
                 try {
-                  await changeStatus(selectedSale?.id, pendingStatus);
+                  await changeStatus(selectedSale?.id, pendingStatus, externalTrackingCode);
                   setIsStatusDrawerOpen(false);
                   setPendingStatus(null);
                 } catch (error) {
@@ -1202,7 +1283,7 @@ const SalesDashboard = () => {
                 }
               }}
             >
-              Mudar status para {pendingStatus}
+              Confirmar alteração
             </Button>
           </DrawerFooter>
         </DrawerContent>
@@ -1248,10 +1329,34 @@ const SalesDashboard = () => {
           <DrawerBody>
             <Stack spacing={5}>
               <Text color="gray.600">
-                Você está prestes a gerar a etiqueta de envio deste
-                pedido. Antes de continuar, confira as informações
-                da entrega.
+                Você está prestes a comprar o frete e gerar a etiqueta deste
+                pedido. Confira os dados antes de continuar.
               </Text>
+
+              <Box border="1px solid" borderColor="gray.200" borderRadius="lg" p={4}>
+                <FormControl display="flex" alignItems="center" justifyContent="space-between">
+                  <Box pr={4}>
+                    <FormLabel mb={1} fontWeight="semibold">Usar nota fiscal na etiqueta</FormLabel>
+                    <Text fontSize="sm" color="gray.600">
+                      Ative somente se este pedido tiver NF-e. Para envio sem nota, deixe desligado.
+                    </Text>
+                  </Box>
+                  <Switch isChecked={useInvoice} onChange={(event) => setUseInvoice(event.target.checked)} colorScheme="blue" />
+                </FormControl>
+                {useInvoice ? (
+                  <FormControl mt={4} isRequired>
+                    <FormLabel>Chave de acesso da NF-e</FormLabel>
+                    <Input
+                      value={invoiceKey}
+                      onChange={(event) => setInvoiceKey(event.target.value.replace(/\D/g, "").slice(0, 44))}
+                      placeholder="44 dígitos"
+                      inputMode="numeric"
+                      maxLength={44}
+                    />
+                    <Text mt={1} fontSize="xs" color="gray.500">A chave precisa ter 44 dígitos.</Text>
+                  </FormControl>
+                ) : null}
+              </Box>
 
               <Box
                 border="1px solid"
@@ -1282,8 +1387,10 @@ const SalesDashboard = () => {
                         Geração da etiqueta
                       </Text>
                       <Text fontSize="sm" color="gray.600">
-                        O sistema iniciará o processo de geração da
-                        etiqueta para este pedido.
+                        O frete será comprado
+                        <Text as="span" fontSize="sm" color="orange.700" display="block" mt={1}>
+                          A cobrança será feita pela conta do Melhor Envio conectada à loja, conforme o valor do frete.
+                        </Text>
                       </Text>
                     </Box>
                   </HStack>
@@ -1306,8 +1413,7 @@ const SalesDashboard = () => {
                         Próximo passo
                       </Text>
                       <Text fontSize="sm" color="gray.600">
-                        Após a geração, você poderá imprimir a etiqueta
-                        conforme as opções disponíveis no sistema.
+                        A etiqueta ficará disponível para impressão após a confirmação do Melhor Envio.
                       </Text>
                     </Box>
                   </HStack>
@@ -1331,16 +1437,14 @@ const SalesDashboard = () => {
                       Importante
                     </Text>
                     <Text fontSize="sm" color="orange.800">
-                      Gerar a etiqueta não significa que o pedido
-                      foi enviado. Confira os dados de entrega antes
-                      de continuar.
+                      A compra do frete não despacha o pacote automaticamente. Depois, embale o pedido e entregue-o no ponto ou transportadora indicados pelo Melhor Envio.
                     </Text>
                   </Box>
                 </HStack>
               </Box>
 
               <Text fontSize="sm" color="gray.500">
-                Deseja continuar com a geração da etiqueta?
+                Ao confirmar, o frete poderá ser cobrado imediatamente. Deseja continuar?
               </Text>
             </Stack>
           </DrawerBody>
@@ -1356,14 +1460,18 @@ const SalesDashboard = () => {
             </Button>
 
             <Button
-              colorScheme="blue"
+              colorScheme="brand"
               width="full"
               leftIcon={<FiPackage />}
               isLoading={generatingLabel}
               loadingText="Gerando etiqueta..."
               onClick={async () => {
                 try {
-                  await generateLabel();
+                  if (useInvoice && invoiceKey.replace(/\D/g, "").length !== 44) {
+                    errorNotification("Chave da NF-e inválida", "Informe a chave completa com 44 dígitos para continuar.");
+                    return;
+                  }
+                  await generateLabel(selectedSale.id, useInvoice ? invoiceKey : "");
                   setIsGenerateLabelDrawerOpen(false);
                 } catch (error) {
                   console.error("Erro ao gerar etiqueta:", error);
@@ -1395,7 +1503,7 @@ const SetupChecklist = ({ setupData, salesCount }) => {
     {
       label: "Seu perfil",
       description: "Nome e contato do responsável",
-      done: Boolean(profile.name && profile.email && profile.phone),
+      done: Boolean(profile.name && profile.email && profile.phone && profile.cpf),
       href: "/dashboard/profile",
       icon: FiUser,
     },
@@ -1410,9 +1518,9 @@ const SetupChecklist = ({ setupData, salesCount }) => {
     },
     {
       label: "Contato para venda",
-      description: "WhatsApp cadastrado (Instagram opcional)",
-      done: Boolean(store.whatsapp),
-      href: "/dashboard/store",
+      description: "WhatsApp e Instagram cadastrados",
+      done: Boolean(store.whatsapp && store.instagram),
+      href: "/dashboard/profile",
       icon: FiMessageCircle,
     },
     {
@@ -1432,7 +1540,10 @@ const SetupChecklist = ({ setupData, salesCount }) => {
     {
       label: "Entrega ou retirada",
       description: "Uma forma de receber o pedido",
-      done: Boolean(store.pickupEnabled || store.localDeliveryEnabled),
+      done:
+        (store.pickupEnabled && Boolean(store.pickupAddress?.zip && store.pickupAddress?.street)) ||
+        (store.localDeliveryEnabled && Boolean(store.shippingOriginZip)) ||
+        Boolean(store.melhorEnvioConfigured),
       href: "/dashboard/shipping",
       icon: FiMapPin,
     },
@@ -1441,7 +1552,7 @@ const SetupChecklist = ({ setupData, salesCount }) => {
       description: store.plan === "FREE"
         ? "Disponível no plano Completo"
         : "Conta de pagamento conectada",
-      done: store.plan === "FREE" || Boolean(store.mercadoPagoConfigured),
+      done: Boolean(store.mercadoPagoConfigured),
       href: "/dashboard/payments",
       icon: FiCreditCard,
     },
@@ -1502,14 +1613,6 @@ const SetupChecklist = ({ setupData, salesCount }) => {
             h="8px"
           />
         </Box>
-        <Button
-          as="a"
-          href={steps.find((step) => !step.done)?.href || "/dashboard/store"}
-          colorScheme="brand"
-          alignSelf={{ base: "stretch", lg: "center" }}
-        >
-          Continuar configurando
-        </Button>
       </Flex>
 
       <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={3} mt={5}>
@@ -1554,7 +1657,7 @@ const SetupChecklist = ({ setupData, salesCount }) => {
   );
 };
 
-const OrderOperationPanel = ({ sale, action, isLoading, onChangeStatus, isGeneratingLabel, onGenerateLabel, isPrintingLabel, onPrintLabel, isRefreshingTracking, onRefreshTracking }) => {
+const OrderOperationPanel = ({ sale, action, isLoading, onChangeStatus, isGeneratingLabel, onGenerateLabel, isPrintingLabel, onPrintLabel, isRefreshingTracking, onRefreshTracking, onSaveTracking }) => {
   const usesMelhorEnvio = sale.shippingMethod?.startsWith("melhor_envio:");
   return (
     <Box
@@ -1634,6 +1737,26 @@ const OrderOperationPanel = ({ sale, action, isLoading, onChangeStatus, isGenera
     </Box>
   );
 };
+
+const TrackingPanel = ({ sale, onSaveTracking }) => (
+  <Box borderWidth="1px" borderColor="gray.200" borderRadius="xl" bg="white" p={4}>
+    <Text fontSize="xs" fontWeight="700" color="gray.500" textTransform="uppercase" letterSpacing="wide" mb={1}>
+      Rastreamento
+    </Text>
+    <Text fontSize="sm" color="gray.600" mb={3}>
+      {sale.melhorEnvioShipmentId
+        ? "Sincronize o código do Melhor Envio ou informe o código caso a etiqueta tenha sido criada fora da Kizi."
+        : "Informe o código se a etiqueta foi criada diretamente no site da transportadora."}
+    </Text>
+    <Flex gap={2} direction={{ base: "column", sm: "row" }}>
+      <Input bg="white" placeholder="Ex.: AA123456789BR" defaultValue={sale.externalTrackingCode || sale.melhorEnvioTrackingCode || ""} id={`tracking-${sale.id}`} />
+      <Button variant="outline" flexShrink={0} onClick={() => onSaveTracking(sale.id, document.getElementById(`tracking-${sale.id}`)?.value || "")}>Salvar código</Button>
+    </Flex>
+    {(sale.externalTrackingCode || sale.melhorEnvioTrackingCode) ? (
+      <Text mt={2} fontSize="xs" color="green.700">Código salvo: {sale.externalTrackingCode || sale.melhorEnvioTrackingCode}</Text>
+    ) : null}
+  </Box>
+);
 
 const dashboardTone = {
   green: {

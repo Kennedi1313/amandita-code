@@ -6,6 +6,7 @@ import SearchBar from "./searchMenu";
 import { useRouter } from "next/router";
 import { useShoppingCart } from "@/hooks/use-shopping-cart";
 import useStoreInfo from "@/hooks/use-store-info";
+import { getStoreInitials } from "@/lib/brand";
 import {
   FiHeart,
   FiMenu,
@@ -147,15 +148,15 @@ export default function Menu() {
         </button>
 
         {/* Logo */}
-        <div className="absolute left-1/2 top-0 z-50 flex h-16 w-[10rem] -translate-x-1/2 justify-center md:relative md:left-1/3 md:h-[5rem] md:w-1/3 md:translate-x-0 md:self-start">
+        <div className="absolute content-center align-center left-1/2 top-0 z-50 flex h-16 w-[10rem] -translate-x-1/2 justify-center md:relative md:left-1/3 md:h-[5rem] md:w-1/3 md:translate-x-0 md:self-start">
           <Link
             href={{ pathname: "/" }}
-            className="relative h-full w-full overflow-hidden md:h-[5rem] md:w-[9rem]"
+            className="relative h-full w-full overflow-hidden md:h-[5rem] md:w-[9rem] content-center align-center"
             onClick={() => {
               updateCategory("");
             }}
           >
-            <Image
+            {storeInfo.logoUrl ? <Image
               src={
                 storeInfo.logoUrl.match(/^https?:\/\//i)
                   ? storeInfo.logoUrl
@@ -164,7 +165,9 @@ export default function Menu() {
               alt={`Página inicial de ${storeInfo.name}`}
               fill
               className="object-contain w-full"
-            />
+            /> : <span className="flex h-[3.5rem] w-[3.5rem] rounded-full items-center justify-center font-serif text-[3rem] font-bold tracking-[-1px]" style={{ margin: "0 auto", backgroundColor: headerBackgroundColor, color: headerForegroundColor }}>
+              {getStoreInitials(storeInfo.name)}
+            </span>}
           </Link>
         </div>
 

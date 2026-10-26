@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Item from "../../components/item";
 import Pagination from "@/components/pagination";
 import { usePagination } from "@/components/Context/paginationContext";
@@ -18,11 +18,7 @@ export default function Home({ products, category, itemsCount }: HomeProps) {
     setCurrentPage(0);
   }, [category, setCurrentPage]);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [currentPage, category]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
       const data = await getProductsByCategory(category, currentPage);
@@ -32,7 +28,11 @@ export default function Home({ products, category, itemsCount }: HomeProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [category, currentPage]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const renderProductList = () => (
     <div>

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { toast } from "react-hot-toast";
 import { useShoppingFavorites } from "@/hooks/use-shopping-favorites";
 import {
@@ -172,7 +173,49 @@ export default function Details(props: Product) {
       <p className="text-center text-lg py-12">Loading...</p>
     </>
   ) : (
-    <div className="md:container md:max-w-screen-lg mx-auto p-2 mt-20 md:mt-[8.5rem] md:px-8 h-full">
+    <>
+      <Head>
+        <title>{props.name} | {storeInfo.name}</title>
+        <meta
+          name="description"
+          content={`${props.name}: ${String(props.description || "Confira detalhes e compre online.").slice(0, 150)}`}
+        />
+        <link rel="canonical" href={productUrl} />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content={`${props.name} | ${storeInfo.name}`} />
+        <meta property="og:description" content={String(props.description || "Confira este produto.").slice(0, 200)} />
+        <meta property="og:url" content={productUrl} />
+        {imageIds[0] ? <meta property="og:image" content={getProductImageUrl(props.id, imageIds[0])} /> : null}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Product",
+              name: props.name,
+              description: props.description,
+              image: imageIds.map((imageId) => getProductImageUrl(props.id, imageId)),
+              url: productUrl,
+              brand: { "@type": "Brand", name: storeInfo.name },
+              offers: {
+                "@type": "Offer",
+                url: productUrl,
+                priceCurrency: "BRL",
+                price: (Number(String(visiblePrice).replace(/\D/g, "")) / 100).toFixed(2),
+                availability: hasStock
+                  ? "https://schema.org/InStock"
+                  : "https://schema.org/OutOfStock",
+              },
+            }),
+          }}
+        />
+      </Head>
+      <div className="md:container md:max-w-screen-lg mx-auto p-2 pb-28 mt-20 md:mt-[8.5rem] md:px-8 md:pb-2 h-full">
+        <nav aria-label="Breadcrumb" className="mb-4 text-sm text-gray-500">
+          <Link href="/" className="hover:text-gray-900">Início</Link>
+          <span aria-hidden="true" className="mx-2">/</span>
+          <span aria-current="page">{props.name}</span>
+        </nav>
       <div
         className="flex flex-col md:flex-row justify-between items-center space-y-8 container pt-2 
                     md:pt-12 md:space-y-0 md:space-x-12 h-full"
@@ -216,8 +259,8 @@ export default function Details(props: Product) {
 
         <div className="flex flex-col max-w-md w-full rounded-md gap-2">
           {!hasStock ? (
-            <span className="text-xl font-semibold rounded-lg bg-red-600 py-2 px-4 text-white w-fit">
-              Produto Indisponível
+            <span className="inline-flex w-fit max-w-full items-center rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 sm:text-sm">
+              Esgotado
             </span>
           ) : null}
           <p className="text-2xl font-semibold">{props.name}</p>
@@ -276,8 +319,7 @@ export default function Details(props: Product) {
             <p className="text-gray-500">Descrição:</p>
             <p className="whitespace-pre-line">{props.description}</p>
           </div>
-          <div
-            className="flex flex-row w-full cursor-pointer gap-2 items-center justify-center mt-4">
+          <div className="fixed inset-x-0 bottom-0 z-40 mt-0 flex w-full items-stretch gap-2 border-t border-gray-200 bg-white/95 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-8px_24px_rgba(0,0,0,0.08)] backdrop-blur sm:gap-3 md:static md:mt-4 md:max-w-md md:rounded-md md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
             {!hasStock ? (
               <a
                 href={
@@ -287,10 +329,12 @@ export default function Details(props: Product) {
                 }
                 target="_blank"
                 aria-disabled={!storeWhatsapp}
-                className="rounded-md flex flex-row text-white bg-green-whatsapp gap-2 justify-center items-center p-2 h-12 mt-2 w-full aria-disabled:opacity-50"
+                aria-label={`Avise-me no WhatsApp quando ${props.name} voltar ao estoque`}
+                className="mt-2 inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-green-whatsapp px-3 py-2 text-center text-xs font-semibold leading-tight text-white transition hover:brightness-95 aria-disabled:pointer-events-none aria-disabled:opacity-50 sm:text-sm"
               >
-                <BsWhatsapp className="w-5 h-5"></BsWhatsapp>
-                <span className="font-bold text-[14px]">
+                <BsWhatsapp className="h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
+                <span className="sm:hidden">Avise-me quando voltar</span>
+                <span className="hidden sm:inline">
                   Me avise quando chegar
                 </span>
               </a>
@@ -298,7 +342,7 @@ export default function Details(props: Product) {
               <button
                 type="button"
                 style={{ backgroundColor: headerBackgroundColor, color: headerForegroundColor }} 
-                className="rounded-md border flex flex-row text-white font-bold bg-brand gap-2 justify-center items-center p-2 h-12 mt-2 w-full disabled:opacity-50 disabled:cursor-not-allowed border-black"
+                className="mt-2 inline-flex min-h-12 min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-black p-2 font-bold disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={reachedStockLimit && !isInCart()}
                 onClick={() => {
                   isInCart()
@@ -327,8 +371,11 @@ export default function Details(props: Product) {
                 )}
               </button>
             )}
-            <div
-              className="rounded-md flex border border-rose-400 flex-row gap-2 justify-center items-center p-0 h-12 mt-2 w-16"
+            <button
+              type="button"
+              aria-label={`${isInFavorites() ? "Remover dos" : "Adicionar aos"} favoritos: ${props.name}`}
+              aria-pressed={isInFavorites()}
+              className="mt-2 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-rose-300 transition hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
               onClick={() => {
                 isInFavorites()
                   ? removeItemFavorites(props)
@@ -336,15 +383,16 @@ export default function Details(props: Product) {
               }}
             >
               {isInFavorites() ? (
-                <BsFillHeartFill className="w-[1.6rem] h-[1.6rem] text-rose-400 font-bold"></BsFillHeartFill>
+                <BsFillHeartFill className="h-5 w-5 text-rose-400" />
               ) : (
-                <BsHeart className="w-[1.6rem] h-[1.6rem] text-rose-400 font-bold"></BsHeart>
+                <BsHeart className="h-5 w-5 text-rose-400" />
               )}
-            </div>
+            </button>
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 

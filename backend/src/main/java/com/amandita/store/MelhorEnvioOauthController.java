@@ -78,7 +78,7 @@ public class MelhorEnvioOauthController {
                 + "&response_type=code"
                 + "&redirect_uri=" + URLEncoder.encode(redirectUri, StandardCharsets.UTF_8)
                 + "&scope=" + URLEncoder.encode(
-                "shipping-calculate shipping-companies cart-read cart-write orders-read products-read products-write purchases-read shipping-cancel shipping-checkout shipping-companies shipping-generate shipping-print shipping-preview shipping-tracking shipping-share ecommerce-shipping",
+                "shipping-calculate shipping-companies companies-read users-read cart-read cart-write orders-read products-read products-write purchases-read shipping-cancel shipping-checkout shipping-generate shipping-print shipping-preview shipping-tracking shipping-share ecommerce-shipping",
                 StandardCharsets.UTF_8)
                 + "&state=" + URLEncoder.encode(state, StandardCharsets.UTF_8);
     }
@@ -130,6 +130,14 @@ public class MelhorEnvioOauthController {
 
                 store.setMelhorEnvioAccessToken(accessToken);
                 store.setMelhorEnvioRefreshToken(refreshToken);
+                try {
+                    syncMelhorEnvioOrigin(store, accessToken);
+                } catch (RuntimeException syncException) {
+                    // A conexão OAuth continua válida mesmo quando a conta não libera
+                    // a consulta de empresas/endereço (por exemplo, 403 no sandbox).
+                    System.err.println("Não foi possível sincronizar o endereço de postagem do Melhor Envio: "
+                            + syncException.getMessage());
+                }
                 storeDao.insertStore(store);
 
                 String painelUrl = adminUrl + "/dashboard/shipping?melhorenvio=connected";
@@ -139,6 +147,128 @@ public class MelhorEnvioOauthController {
             }
         } catch (IOException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    private void syncMelhorEnvioOrigin(Store store, String accessToken) throws IOException {
+        try {
+            String companiesBody = getMelhorEnvio(accessToken, "/api/v2/me/companies");
+            JSONArray companies = responseArray(companiesBody, "companies");
+            if (!companies.isEmpty()) {
+                JSONObject company = companies.getJSONObject(0);
+                String companyId = String.valueOf(company.opt("id"));
+                store.setMelhorEnvioCompanyId(companyId);
+
+                String addressesBody = getMelhorEnvio(accessToken,
+                        "/api/v2/me/companies/" + companyId + "/addresses");
+                JSONArray addresses = responseArray(addressesBody, "addresses");
+                if (!addresses.isEmpty()) {
+                    PickupAddress incomingAddress = toPickupAddress(addresses.getJSONObject(0));
+                    store.setMelhorEnvioOriginAddress(incomingAddress);
+                    return;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Algumas contas/sandbox não liberam a consulta de empresas.
+        }
+
+        // Fallback apenas para contas que não possuem uma empresa/loja cadastrada.
+        try {
+            String profileBody = getMelhorEnvio(accessToken, "/api/v2/me");
+            JSONObject profile = new JSONObject(profileBody);
+            JSONArray profileAddresses = profile.optJSONArray("addresses");
+            if (profileAddresses != null && !profileAddresses.isEmpty()) {
+                Object rawAddress = profileAddresses.get(0);
+                JSONObject address = rawAddress instanceof JSONObject
+                        ? (JSONObject) rawAddress
+                        : new JSONObject().put("id", String.valueOf(rawAddress));
+                String addressId = address.has("id") ? address.optString("id", "") : "";
+                if (address.has("postal_code")) {
+                    store.setMelhorEnvioOriginAddress(toPickupAddress(address));
+                    return;
+                }
+                if (StringUtils.isNotBlank(addressId)) {
+                    store.setMelhorEnvioOriginAddress(toPickupAddress(
+                            new JSONObject(getMelhorEnvio(accessToken, "/api/v2/me/addresses/" + addressId))));
+                    return;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Algumas contas permitem consultar empresas, mas não o perfil /me.
+        }
+
+        store.setMelhorEnvioOriginAddress(null);
+    }
+
+    private PickupAddress toPickupAddress(JSONObject address) {
+        Object stateValue = address.has("state") ? address.opt("state") : address.opt("state_abbr");
+        String state = stateValue instanceof JSONObject
+                ? ((JSONObject) stateValue).optString("state_abbr", "")
+                : String.valueOf(stateValue == null ? "" : stateValue);
+        if (state.trim().startsWith("{")) {
+            state = new JSONObject(state).optString("state_abbr", "");
+        }
+        if (StringUtils.isBlank(state)) {
+            state = address.optString("state_abbr", "");
+        }
+        Object cityValue = address.opt("city");
+        String city = cityValue instanceof JSONObject
+                ? ((JSONObject) cityValue).optString("city", "")
+                : String.valueOf(cityValue == null ? "" : cityValue);
+        if (cityValue instanceof JSONObject) {
+            JSONObject cityObject = (JSONObject) cityValue;
+            JSONObject nestedState = cityObject.optJSONObject("state");
+            if (nestedState != null) {
+                state = nestedState.optString("state_abbr", state);
+            }
+        }
+        return new PickupAddress(
+                address.optString("postal_code", "").replaceAll("\\D", ""),
+                address.optString("address", address.optString("street", "")),
+                address.optString("number", ""),
+                address.optString("district", address.optString("neighborhood", "")),
+                city,
+                state,
+                address.optString("complement", address.optString("reference", "")));
+    }
+
+    private PickupAddress mergeOriginAddress(PickupAddress previous, PickupAddress incoming) {
+        if (previous == null || StringUtils.isNotBlank(incoming.state())) return incoming;
+        if (StringUtils.equals(StringUtils.deleteWhitespace(previous.zip()),
+                StringUtils.deleteWhitespace(incoming.zip()))) {
+            return new PickupAddress(incoming.zip(), incoming.street(), incoming.number(),
+                    incoming.district(), incoming.city(), previous.state(), incoming.reference());
+        }
+        return incoming;
+    }
+
+    private JSONArray responseArray(String body, String namedField) {
+        String normalized = StringUtils.defaultString(body, "[]").trim();
+        if (normalized.startsWith("[")) {
+            return new JSONArray(normalized);
+        }
+        JSONObject object = new JSONObject(normalized);
+        JSONArray array = object.optJSONArray("data");
+        if (array != null) return array;
+        array = object.optJSONArray(namedField);
+        if (array != null) return array;
+        return new JSONArray();
+    }
+
+    private String getMelhorEnvio(String accessToken, String path) throws IOException {
+        Request request = new Request.Builder()
+                .url(apiBaseUrl() + path)
+                .get()
+                .addHeader("Authorization", "Bearer " + accessToken)
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", userAgent)
+                .build();
+        try (Response response = new OkHttpClient().newCall(request).execute()) {
+            String body = response.body() == null ? "[]" : response.body().string();
+            if (!response.isSuccessful()) {
+                throw new IllegalStateException("Não foi possível consultar o endereço de postagem no Melhor Envio: HTTP " + response.code());
+            }
+            return body;
         }
     }
 
@@ -172,7 +302,11 @@ public class MelhorEnvioOauthController {
         OkHttpClient client = new OkHttpClient();
 
         JSONObject payload = new JSONObject();
-        payload.put("from", new JSONObject().put("postal_code", "01001-000"));
+        PickupAddress origin = store.getMelhorEnvioOriginAddress();
+        if (origin == null || StringUtils.isBlank(origin.zip())) {
+            throw new IllegalStateException("Conecte novamente o Melhor Envio para sincronizar o endereço de postagem.");
+        }
+        payload.put("from", new JSONObject().put("postal_code", origin.zip()));
         payload.put("to", new JSONObject().put("postal_code", "20040-000"));
 
         JSONArray products = new JSONArray();
@@ -263,8 +397,8 @@ public class MelhorEnvioOauthController {
     }
 
     @PostMapping("/sales/{saleId}/label")
-    public ResponseEntity<?> createSaleLabel(@PathVariable Long saleId, HttpServletRequest request) {
-        return ResponseEntity.ok(shipmentService.createLabel(saleId, (Long) request.getAttribute("storeId")));
+    public ResponseEntity<?> createSaleLabel(@PathVariable Long saleId, @RequestBody(required = false) LabelRequest body, HttpServletRequest request) {
+        return ResponseEntity.ok(shipmentService.createLabel(saleId, (Long) request.getAttribute("storeId"), body == null ? null : body.invoiceKey()));
     }
 
     @PostMapping("/sales/{saleId}/print")
@@ -276,6 +410,8 @@ public class MelhorEnvioOauthController {
     public ResponseEntity<?> refreshSaleTracking(@PathVariable Long saleId, HttpServletRequest request) {
         return ResponseEntity.ok(shipmentService.refreshTracking(saleId, (Long) request.getAttribute("storeId")));
     }
+
+    private record LabelRequest(String invoiceKey) {}
 
     private String refreshAccessToken(Store store) throws IOException {
         okhttp3.RequestBody refreshBody = new FormBody.Builder()

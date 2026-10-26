@@ -6,5 +6,6 @@ public record PickupAddress(
         String number,
         String district,
         String city,
+        String state,
         String reference
 ) {}

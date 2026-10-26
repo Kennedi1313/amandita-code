@@ -30,6 +30,7 @@ public class CustomerDTOMapper implements Function<Customer, CustomerDTO> {
                             address.getNumber(),
                             address.getDistrict(),
                             address.getCity(),
+                            address.getState(),
                             address.getReference()))
                         .collect(Collectors.toSet()),
                 customer.getCpf()

@@ -147,11 +147,11 @@ export const cancelStoreSubscription = async () =>
 export const switchStoreToFree = async () =>
   axios.post(`${getUrl()}/api/v1/store/plan/subscription/free`, {}, getAuthConfig());
 
-export const createCategory = async (name) => {
+export const createCategory = async (category) => {
   try {
     return await axios.post(
       `${getUrl()}/api/v1/store/categories`,
-      { name },
+      category,
       getAuthConfig(),
     );
   } catch (e) {
@@ -159,11 +159,11 @@ export const createCategory = async (name) => {
   }
 };
 
-export const updateCategory = async (id, name) => {
+export const updateCategory = async (id, category) => {
   try {
     return await axios.put(
       `${getUrl()}/api/v1/store/categories/${id}`,
-      { name },
+      category,
       getAuthConfig(),
     );
   } catch (e) {
@@ -218,6 +218,9 @@ export const updateStoreInfo = async (store) => {
     throw e;
   }
 };
+
+export const deleteStore = async () =>
+  axios.delete(`${getUrl()}/api/v1/store`, getAuthConfig());
 
 export const findAddressByCep = async (cep) => {
   const normalizedCep = String(cep || "").replace(/\D/g, "");

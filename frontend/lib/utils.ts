@@ -21,7 +21,10 @@ export const formatSimpleCurrency = (amount = 0, currency = "BRL") =>
   }).format(amount / 100);
 
 export const formatDate = (dateString: string) => {
-  const date = new Date(dateString);
+  const normalizedDate = dateString && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(dateString)
+    ? `${dateString}Z`
+    : dateString;
+  const date = new Date(normalizedDate);
   return !isNaN(date as any)
     ? date.toLocaleDateString("pt-BR", {
         day: "2-digit",
@@ -29,6 +32,7 @@ export const formatDate = (dateString: string) => {
         year: "numeric",
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "America/Fortaleza",
       })
     : "Data inválida";
 };

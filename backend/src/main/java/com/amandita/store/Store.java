@@ -17,6 +17,8 @@ public class Store {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String name;
+    @Column(name = "tax_document", length = 14)
+    private String taxDocument;
     @Column(unique = true)
     private String domain;
     private String logoUrl;
@@ -56,11 +58,16 @@ public class Store {
     private String melhorEnvioRefreshToken;
     private String instagram;
     private String whatsapp;
-    private Boolean pickupEnabled = true;
+    private Boolean pickupEnabled = false;
     @Type(JsonBinaryType.class)
     @Column(name = "pickup_address", columnDefinition = "jsonb")
     private PickupAddress pickupAddress;
-    private Boolean localDeliveryEnabled = true;
+    @Type(JsonBinaryType.class)
+    @Column(name = "melhor_envio_origin_address", columnDefinition = "jsonb")
+    private PickupAddress melhorEnvioOriginAddress;
+    @Column(name = "melhor_envio_company_id")
+    private String melhorEnvioCompanyId;
+    private Boolean localDeliveryEnabled = false;
     private Integer localDeliveryFee = 0;
     private Integer freeShippingMinAmount = 0;
     private String shippingOriginZip;
@@ -92,6 +99,9 @@ public class Store {
     public void setName(String name) {
         this.name = name;
     }
+
+    public String getTaxDocument() { return taxDocument; }
+    public void setTaxDocument(String taxDocument) { this.taxDocument = taxDocument; }
 
     public String getDomain() {
         return domain;
@@ -271,6 +281,18 @@ public class Store {
         this.pickupAddress = pickupAddress;
     }
 
+    public PickupAddress getMelhorEnvioOriginAddress() { return melhorEnvioOriginAddress; }
+
+    public void setMelhorEnvioOriginAddress(PickupAddress address) {
+        this.melhorEnvioOriginAddress = address;
+    }
+
+    public String getMelhorEnvioCompanyId() { return melhorEnvioCompanyId; }
+
+    public void setMelhorEnvioCompanyId(String melhorEnvioCompanyId) {
+        this.melhorEnvioCompanyId = melhorEnvioCompanyId;
+    }
+
     public Boolean getLocalDeliveryEnabled() {
         return localDeliveryEnabled;
     }
@@ -341,7 +363,4 @@ public class Store {
         this.categories = categories;
     }
 
-    public String getOwnerDocument() {
-        return "70388201410";
-    }
 }

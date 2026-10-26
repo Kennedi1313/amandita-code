@@ -252,6 +252,9 @@ public class AsaasCheckoutService {
         sale.setShippingMethod(chosenMethod);
         sale.setShippingFee(shippingFee);
         sale.setShippingZip(saleRequest.getShippingZip());
+        if (customer.getAddresses() != null) {
+            customer.getAddresses().stream().findFirst().ifPresent(sale::snapshotShippingAddress);
+        }
         sale.setShippingQuote(saleRequest.getShippingQuote());
         sale.setPaymentMethod(provider);
         sale.setStore(store);

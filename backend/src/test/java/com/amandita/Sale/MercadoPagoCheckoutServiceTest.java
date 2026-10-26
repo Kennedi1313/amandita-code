@@ -20,6 +20,24 @@ import static org.mockito.Mockito.*;
 
 class MercadoPagoCheckoutServiceTest {
     @Test
+    void localStoreUsesHttpsReturnHostWithoutPortForMercadoPago() {
+        MercadoPagoCheckoutService service = new MercadoPagoCheckoutService(
+                mock(AsaasCheckoutService.class),
+                mock(SaleDao.class),
+                mock(StoreDao.class),
+                mock(MercadoPagoOAuthService.class),
+                new ObjectMapper(),
+                "https://example.com/api/v1/payment/mercadopago/webhook",
+                "webhook-secret",
+                "",
+                "");
+        Store store = new Store();
+        store.setDomain("localhost");
+
+        assertThat(service.storefrontBaseUrl(store)).isEqualTo("https://localhost");
+    }
+
+    @Test
     void preferenceIncludesProductCategoryAndDescription() throws Exception {
         AsaasCheckoutService saleCheckout = mock(AsaasCheckoutService.class);
         SaleDao saleDao = mock(SaleDao.class);
@@ -76,5 +94,7 @@ class MercadoPagoCheckoutServiceTest {
         JsonNode item = preferenceCaptor.getValue().path("items").get(0);
         assertThat(item.path("category_id").asText()).isEqualTo("Roupas");
         assertThat(item.path("description").asText()).isEqualTo("Camisa de algodão");
+        assertThat(preferenceCaptor.getValue().path("back_urls").path("success").asText())
+                .startsWith("https://loja.example.com/success?");
     }
 }

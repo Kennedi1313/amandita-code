@@ -1,6 +1,10 @@
 package com.amandita.store;
 
 public record CategoryRequest(
-        String name
+        String name,
+        java.math.BigDecimal weightKg,
+        Integer widthCm,
+        Integer heightCm,
+        Integer lengthCm
 ) {
 }

@@ -70,11 +70,19 @@ const emptyPickupAddress = () => ({
   number: "",
   district: "",
   city: "",
+  state: "",
   reference: "",
 });
 const normalizePickupAddress = (address) => ({
   ...emptyPickupAddress(),
   ...(address || {}),
+  zip: address?.zip || "",
+  street: address?.street || "",
+  number: address?.number || "",
+  district: address?.district || "",
+  city: address?.city || "",
+  state: address?.state || "",
+  reference: address?.reference || "",
 });
 
 const MoneyInput = ({ value, onChange, ...inputProps }) => {
@@ -106,6 +114,7 @@ const MoneyInput = ({ value, onChange, ...inputProps }) => {
 const StoreSettings = ({ section = "store" }) => {
   const [store, setStore] = useState({
     name: "",
+    taxDocument: "",
     domain: "",
     logoUrl: "",
     headerBackgroundColor: "#FFFFFF",
@@ -114,9 +123,10 @@ const StoreSettings = ({ section = "store" }) => {
     iconUrl: "",
     instagram: "",
     whatsapp: "",
-    pickupEnabled: true,
+    pickupEnabled: false,
     pickupAddress: emptyPickupAddress(),
-    localDeliveryEnabled: true,
+    melhorEnvioOriginAddress: emptyPickupAddress(),
+    localDeliveryEnabled: false,
     localDeliveryFee: 0,
     deliveryDistanceRanges: [],
     freeShippingMinAmount: 0,
@@ -160,6 +170,7 @@ const StoreSettings = ({ section = "store" }) => {
         setPlan(res.data.plan || "FREE");
         setStore({
           name: res.data.name || "",
+          taxDocument: res.data.taxDocument || "",
           domain: res.data.domain || "",
           logoUrl: res.data.logoUrl || "",
           headerBackgroundColor: res.data.headerBackgroundColor || "#FFFFFF",
@@ -168,9 +179,10 @@ const StoreSettings = ({ section = "store" }) => {
           iconUrl: res.data.iconUrl || "",
           instagram: res.data.instagram || "",
           whatsapp: res.data.whatsapp || "",
-          pickupEnabled: res.data.pickupEnabled !== false,
+          pickupEnabled: res.data.pickupEnabled === true,
           pickupAddress: normalizePickupAddress(res.data.pickupAddress),
-          localDeliveryEnabled: res.data.localDeliveryEnabled !== false,
+          melhorEnvioOriginAddress: normalizePickupAddress(res.data.melhorEnvioOriginAddress),
+          localDeliveryEnabled: res.data.localDeliveryEnabled === true,
           localDeliveryFee: res.data.localDeliveryFee || 0,
           deliveryDistanceRanges: (res.data.deliveryDistanceRanges || []).map((range) => ({ ...range })),
           freeShippingMinAmount: res.data.freeShippingMinAmount || 0,
@@ -242,7 +254,8 @@ const StoreSettings = ({ section = "store" }) => {
             ...current.pickupAddress,
             street: response.data.logradouro || current.pickupAddress.street,
             district: response.data.bairro || current.pickupAddress.district,
-            city: [response.data.localidade, response.data.uf].filter(Boolean).join(" - ") || current.pickupAddress.city,
+            city: response.data.localidade || current.pickupAddress.city,
+            state: response.data.uf || current.pickupAddress.state,
           },
         };
       });
@@ -285,6 +298,7 @@ const StoreSettings = ({ section = "store" }) => {
       setPlan(response.data.plan || plan);
       setStore({
         name: response.data.name || "",
+        taxDocument: response.data.taxDocument || "",
         domain: response.data.domain || "",
         logoUrl: response.data.logoUrl || "",
         headerBackgroundColor: response.data.headerBackgroundColor || store.headerBackgroundColor,
@@ -293,9 +307,10 @@ const StoreSettings = ({ section = "store" }) => {
         iconUrl: response.data.iconUrl || "",
         instagram: response.data.instagram || "",
         whatsapp: response.data.whatsapp || "",
-        pickupEnabled: response.data.pickupEnabled !== false,
+        pickupEnabled: response.data.pickupEnabled === true,
         pickupAddress: normalizePickupAddress(response.data.pickupAddress || store.pickupAddress),
-        localDeliveryEnabled: response.data.localDeliveryEnabled !== false,
+        melhorEnvioOriginAddress: normalizePickupAddress(response.data.melhorEnvioOriginAddress || store.melhorEnvioOriginAddress),
+        localDeliveryEnabled: response.data.localDeliveryEnabled === true,
         localDeliveryFee: response.data.localDeliveryFee || 0,
         deliveryDistanceRanges: (response.data.deliveryDistanceRanges || []).map((range) => ({ ...range })),
         freeShippingMinAmount: response.data.freeShippingMinAmount || 0,
@@ -330,9 +345,10 @@ const StoreSettings = ({ section = "store" }) => {
         iconUrl: response.data.iconUrl || "",
         instagram: response.data.instagram || "",
         whatsapp: response.data.whatsapp || "",
-        pickupEnabled: response.data.pickupEnabled !== false,
+        pickupEnabled: response.data.pickupEnabled === true,
         pickupAddress: normalizePickupAddress(response.data.pickupAddress || store.pickupAddress),
-        localDeliveryEnabled: response.data.localDeliveryEnabled !== false,
+        melhorEnvioOriginAddress: normalizePickupAddress(response.data.melhorEnvioOriginAddress || store.melhorEnvioOriginAddress),
+        localDeliveryEnabled: response.data.localDeliveryEnabled === true,
         localDeliveryFee: response.data.localDeliveryFee || 0,
         deliveryDistanceRanges: (response.data.deliveryDistanceRanges || []).map((range) => ({ ...range })),
         freeShippingMinAmount: response.data.freeShippingMinAmount || 0,
@@ -350,19 +366,16 @@ const StoreSettings = ({ section = "store" }) => {
     }
   };
 
-  const handleRemoveMobileBanner = async () => {
+  const handleRemoveImage = async (field, label) => {
     setSaving(true);
     try {
-      const response = await updateStoreInfo({ ...store, bannerMobileUrl: "" });
-      setStore((current) => ({
-        ...current,
-        bannerMobileUrl: response.data.bannerMobileUrl || "",
-      }));
-      successNotification("Banner mobile removido", "A vitrine voltou ao comportamento padrão para celulares.");
+      const response = await updateStoreInfo({ ...store, [field]: "" });
+      setStore((current) => ({ ...current, [field]: response.data[field] || "" }));
+      successNotification(`${label} removido`, `${label} removido com sucesso.`);
     } catch (err) {
       errorNotification(
         err.code || "Erro",
-        err.response?.data?.message || "Falha ao remover o banner mobile",
+        err.response?.data?.message || `Falha ao remover ${label.toLowerCase()}`,
       );
     } finally {
       setSaving(false);
@@ -386,7 +399,8 @@ const StoreSettings = ({ section = "store" }) => {
   const pickupAddressConfigured = Boolean(
     store.pickupAddress.zip.replace(/\D/g, "").length === 8 &&
     store.pickupAddress.street.trim() && store.pickupAddress.number.trim() &&
-    store.pickupAddress.district.trim() && store.pickupAddress.city.trim(),
+    store.pickupAddress.district.trim() && store.pickupAddress.city.trim() &&
+    /^[A-Za-z]{2}$/.test(store.pickupAddress.state.trim()),
   );
   const localDeliveryConfigured = Boolean(
     plan === "COMPLETE" && store.localDeliveryEnabled && store.shippingOriginZip.replace(/\D/g, "").length === 8 &&
@@ -610,6 +624,7 @@ const StoreSettings = ({ section = "store" }) => {
                   type="logo"
                   isUploading={uploadingImage === "logo"}
                   onUpload={handleStoreImageUpload}
+                  onRemove={store.logoUrl ? () => handleRemoveImage("logoUrl", "Logo") : undefined}
                 />
 
                 <StoreImagePicker
@@ -618,6 +633,7 @@ const StoreSettings = ({ section = "store" }) => {
                   type="icon"
                   isUploading={uploadingImage === "icon"}
                   onUpload={handleStoreImageUpload}
+                  onRemove={store.iconUrl ? () => handleRemoveImage("iconUrl", "Ícone") : undefined}
                 />
               </SimpleGrid>}
 
@@ -628,6 +644,7 @@ const StoreSettings = ({ section = "store" }) => {
                   type="banner"
                   isUploading={uploadingImage === "banner"}
                   onUpload={handleStoreImageUpload}
+                  onRemove={store.bannerUrl ? () => handleRemoveImage("bannerUrl", "Banner desktop") : undefined}
                   wide
                 />
                 <StoreImagePicker
@@ -636,7 +653,7 @@ const StoreSettings = ({ section = "store" }) => {
                   type="banner-mobile"
                   isUploading={uploadingImage === "banner-mobile"}
                   onUpload={handleStoreImageUpload}
-                  onRemove={store.bannerMobileUrl ? handleRemoveMobileBanner : undefined}
+                  onRemove={store.bannerMobileUrl ? () => handleRemoveImage("bannerMobileUrl", "Banner mobile") : undefined}
                   mobile
                 />
               </SimpleGrid>}
@@ -749,8 +766,12 @@ const StoreSettings = ({ section = "store" }) => {
                             <Input value={store.pickupAddress.district} onChange={(event) => setStore((current) => ({ ...current, pickupAddress: { ...current.pickupAddress, district: event.target.value } }))} focusBorderColor="#1f633c" />
                           </FormControl>
                           <FormControl isRequired>
-                            <FormLabel>Cidade / estado</FormLabel>
+                            <FormLabel>Cidade</FormLabel>
                             <Input value={store.pickupAddress.city} onChange={(event) => setStore((current) => ({ ...current, pickupAddress: { ...current.pickupAddress, city: event.target.value } }))} focusBorderColor="#1f633c" />
+                          </FormControl>
+                          <FormControl isRequired>
+                            <FormLabel>UF</FormLabel>
+                            <Input value={store.pickupAddress.state} maxLength={2} textTransform="uppercase" onChange={(event) => setStore((current) => ({ ...current, pickupAddress: { ...current.pickupAddress, state: event.target.value.toUpperCase().replace(/[^A-Z]/g, "") } }))} focusBorderColor="#1f633c" />
                           </FormControl>
                           <FormControl>
                             <FormLabel>Ponto de referência <Text as="span" color="gray.500" fontWeight="normal">(opcional)</Text></FormLabel>
@@ -899,6 +920,22 @@ const StoreSettings = ({ section = "store" }) => {
                               ? "✓ Conta Melhor Envio conectada"
                               : "○ Nenhuma conta Melhor Envio conectada"}
                           </Text>
+                          {melhorEnvioConfigured && (
+                            <Box mt={3} p={3} borderWidth="1px" borderColor="green.100" borderRadius="md" bg="green.50">
+                              <Text fontSize="xs" fontWeight="bold" color="green.800" textTransform="uppercase">
+                                Endereço de postagem sincronizado
+                              </Text>
+                              {store.melhorEnvioOriginAddress?.zip ? (
+                                <Text fontSize="sm" color="gray.700" mt={1}>
+                                  {store.melhorEnvioOriginAddress.street}, {store.melhorEnvioOriginAddress.number} — {store.melhorEnvioOriginAddress.district}, {store.melhorEnvioOriginAddress.city}/{store.melhorEnvioOriginAddress.state} — CEP {store.melhorEnvioOriginAddress.zip}
+                                </Text>
+                              ) : (
+                                <Text fontSize="sm" color="orange.700" mt={1}>
+                                  Não encontramos um endereço de postagem nessa conta. Reconecte após configurá-lo no Melhor Envio.
+                                </Text>
+                              )}
+                            </Box>
+                          )}
                           <Button
                             mt={4}
                             leftIcon={<Icon as={FiTruck} boxSize={5} />}

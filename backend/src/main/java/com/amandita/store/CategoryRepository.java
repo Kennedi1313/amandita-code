@@ -17,4 +17,6 @@ public interface CategoryRepository extends JpaRepository<Category, Long> {
     boolean existsByStoreIdAndPath(Long storeId, String path);
 
     boolean existsByStoreIdAndNameIgnoreCase(Long storeId, String name);
+
+    java.util.Optional<Category> findByStoreIdAndPath(Long storeId, String path);
 }

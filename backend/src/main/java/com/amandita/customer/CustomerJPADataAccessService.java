@@ -93,6 +93,11 @@ public class CustomerJPADataAccessService implements CustomerDao {
     }
 
     @Override
+    public Optional<Customer> selectCustomerByEmailByStore(String email, Long storeId) {
+        return customerRepository.findCustomerByEmailByStore(email, storeId);
+    }
+
+    @Override
     public Optional<Customer> selectUserByEmail(String email) {
         return customerRepository.findCustomerByEmail(email);
     }

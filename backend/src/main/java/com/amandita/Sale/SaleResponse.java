@@ -22,11 +22,14 @@ public record SaleResponse(
         String shippingMethod,
         Integer shippingFee,
         String shippingZip,
+        ShippingAddress shippingAddress,
         String shippingQuote,
         String melhorEnvioShipmentId,
         String melhorEnvioTrackingCode,
         String melhorEnvioLabelUrl,
         String melhorEnvioStatus,
+        String melhorEnvioInvoiceKey,
+        String externalTrackingCode,
         Long storeId,
         List<SaleItemDTO> items
 ) {
@@ -47,11 +50,20 @@ public record SaleResponse(
                 sale.getShippingMethod(),
                 sale.getShippingFee(),
                 sale.getShippingZip(),
+                new ShippingAddress(
+                        sale.getShippingAddressStreet(),
+                        sale.getShippingAddressNumber(),
+                        sale.getShippingAddressDistrict(),
+                        sale.getShippingAddressCity(),
+                        sale.getShippingAddressState(),
+                        sale.getShippingAddressReference()),
                 sale.getShippingQuote(),
                 sale.getMelhorEnvioShipmentId(),
                 sale.getMelhorEnvioTrackingCode(),
                 sale.getMelhorEnvioLabelUrl(),
                 sale.getMelhorEnvioStatus(),
+                sale.getMelhorEnvioInvoiceKey(),
+                sale.getExternalTrackingCode(),
                 sale.getStore() != null ? sale.getStore().getId() : null,
 
                 sale.getSaleItems() != null
@@ -62,6 +74,15 @@ public record SaleResponse(
                         : List.of()
         );
     }
+
+    public record ShippingAddress(
+            String street,
+            Long number,
+            String district,
+            String city,
+            String state,
+            String reference
+    ) {}
 
     private record SaleItemDTO(
             Long id,

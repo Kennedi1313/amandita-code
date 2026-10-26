@@ -13,7 +13,7 @@ const ProductPrice: React.FC<PriceProps> = ({ price, promo }) => {
 
   return (
     <div className="flex flex-col">
-      <div className="text-md font-normal text-gray-800">
+      <div className="text-md font-normal text-gray-800 font-semibold">
         {hasPromo ? (
           <div className="flex flex-col">
             <span className="line-through text-xs text-red-600 font-normal">

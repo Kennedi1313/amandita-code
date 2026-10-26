@@ -6,7 +6,10 @@ export default function ContactFloating() {
   const storeInfo = useStoreInfo();
   const router = useRouter();
 
-  if (router.pathname === "/checkout") {
+  if (
+    router.pathname === "/checkout" ||
+    router.pathname === "/details/[id]"
+  ) {
     return null;
   }
 

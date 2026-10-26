@@ -1,4 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  enableAnalytics,
+  getAnalyticsConsent,
+  hasAnalyticsConfigured,
+  saveAnalyticsConsent,
+  trackAnalytics,
+} from "./analytics";
 
 const API_URL = (import.meta.env.VITE_API_URL || "http://localhost:8080/api/v1")
   .replace(/\/+$/, "");
@@ -51,10 +58,10 @@ const readApiResponse = async (response) => {
 };
 
 const highlights = [
-  "Sua loja online grátis",
-  "Pedidos pelo WhatsApp ou Mercado Pago",
-  "Painel fácil de usar",
-  "Comece rápido e evolua depois",
+  "Sem custo para criar",
+  "Você escolhe como começar",
+  "WhatsApp e painel simples",
+  "Evolua no seu ritmo",
 ];
 
 const workflow = [
@@ -74,8 +81,8 @@ const workflow = [
 
 const resources = [
   {
-    title: "A gente te ajuda!",
-    text: "Criar a loja é simples, mas se preferir, a gente monta tudo com você.",
+    title: "Prefere deixar com a gente?",
+    text: "Criamos sua loja sem cobrar pela criação e entregamos em até 1 dia útil.",
   },
   {
     title: "Suporte sem robô",
@@ -136,6 +143,14 @@ const questions = [
     title: "O suporte é IA ou humano?",
     text: "O suporte é humano e gratuito. Está disponível no WhatsApp.",
   },
+  {
+    title: "Em quanto tempo minha loja fica pronta?",
+    text: "Criando por conta própria, você coloca a estrutura da loja no ar em até 5 minutos. Se preferir, nossa equipe cria de graça em até 1 dia útil.",
+  },
+  {
+    title: "Preciso pagar para começar?",
+    text: "Não. Você pode começar no plano grátis e só evoluir quando precisar de recursos de pagamento e entrega.",
+  },
 ];
 
 function App() {
@@ -145,6 +160,23 @@ function App() {
   const [subdomainEdited, setSubdomainEdited] = useState(false);
   const [createdStore, setCreatedStore] = useState(null);
   const [status, setStatus] = useState({ type: "idle", message: "" });
+  const [cookiesVisible, setCookiesVisible] = useState(false);
+
+  useEffect(() => {
+    if (!hasAnalyticsConfigured()) return;
+
+    const consent = getAnalyticsConsent();
+    if (consent === "accepted") {
+      enableAnalytics();
+    } else if (consent !== "rejected") {
+      setCookiesVisible(true);
+    }
+  }, []);
+
+  const updateAnalyticsConsent = (consent) => {
+    saveAnalyticsConsent(consent);
+    setCookiesVisible(false);
+  };
 
   const normalizedSubdomain = useMemo(
     () => normalizeSubdomain(store.subdomain || store.storeName),
@@ -186,11 +218,16 @@ function App() {
       googleCredential: credential,
     }));
     setStatus({ type: "idle", message: "" });
+    trackAnalytics("google_sign_in_completed");
     setStep("store");
   }, []);
 
   const createStore = async (event) => {
     event.preventDefault();
+    if (normalizedSubdomain.length < 3) {
+      setStatus({ type: "error", message: "Escolha um endereço de loja com pelo menos 3 caracteres." });
+      return;
+    }
     setStatus({ type: "loading", message: "Montando sua loja..." });
     setCreatedStore(null);
 
@@ -198,6 +235,8 @@ function App() {
       if (!account.googleCredential) {
         throw new Error("Entre com Google para criar sua loja.");
       }
+
+      trackAnalytics("begin_store_creation", { plan: "free" });
 
       const response = await fetch(`${API_URL}/tenants/register`, {
         method: "POST",
@@ -219,6 +258,7 @@ function App() {
 
       window.localStorage.setItem("access_token", data.token);
       setCreatedStore(data);
+      trackAnalytics("store_created", { plan: "free" });
       setStep("done");
       setStatus({
         type: "success",
@@ -246,6 +286,18 @@ function App() {
 
     const targetOrigin = adminUrl.origin;
     let attempts = 0;
+    const stopHandoff = () => window.clearInterval(intervalId);
+    const handleHandoffAccepted = (event) => {
+      if (
+        event.origin === targetOrigin &&
+        event.data?.type === "MOSTRA_DIGITAL_ADMIN_TOKEN_ACCEPTED"
+      ) {
+        stopHandoff();
+        window.removeEventListener("message", handleHandoffAccepted);
+      }
+    };
+
+    window.addEventListener("message", handleHandoffAccepted);
     const intervalId = window.setInterval(() => {
       attempts += 1;
       adminWindow.postMessage(
@@ -256,7 +308,8 @@ function App() {
         targetOrigin,
       );
       if (attempts >= 20 || adminWindow.closed) {
-        window.clearInterval(intervalId);
+        stopHandoff();
+        window.removeEventListener("message", handleHandoffAccepted);
       }
     }, 250);
   };
@@ -275,35 +328,42 @@ function App() {
             <a href="#como-funciona">Como funciona</a>
             <a href="#recursos">Recursos</a>
             <a href="#planos">Planos</a>
-            <a href="#criar">Começar grátis</a>
+            <a href="#criar" onClick={() => trackAnalytics("signup_cta_clicked", { placement: "nav" })}>
+              Começar grátis
+            </a>
           </div>
         </nav>
 
         <div className="hero-grid" id="top">
           <div className="hero-copy">
-            <p className="eyebrow">Tire sua loja do papel</p>
+            <p className="eyebrow">Sua loja online, do jeito mais simples</p>
             <h1>
-              Crie sua loja.
-              <span> Venda do seu jeito.</span>
+              Sua loja no ar.
+              <span> Em até 5 minutos.</span>
             </h1>
             <p className="lead">
-              Monte sua loja em 20 minutos e comece a receber pedidos. Teste grátis e evolua quando sua loja estiver
-              pronta.
+              Crie sua loja grátis, sem precisar entender de tecnologia. Quer pular essa etapa? A gente monta tudo para você, também de graça, em até 1 dia útil.
             </p>
 
             <div className="hero-actions">
-              <a className="primary-link" href="#criar">Criar minha loja grátis</a>
-              <a className="secondary-link" href="#como-funciona">Conhecer a plataforma</a>
+              <a
+                className="primary-link"
+                href="#criar"
+                onClick={() => trackAnalytics("signup_cta_clicked", { placement: "hero" })}
+              >
+                Quero criar minha loja
+              </a>
+              <a
+                className="secondary-link"
+                href={getSupportUrl("Oi! Quero que a KIZI crie minha loja gratuitamente. Entendi que a entrega é em até 1 dia útil.")}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => trackAnalytics("assisted_setup_whatsapp_clicked", { placement: "hero" })}
+              >
+                Prefiro que vocês criem grátis
+              </a>
             </div>
-            <a
-              className="hero-support-link"
-              href={getSupportUrl("Oi! Quero ajuda gratuita para criar minha loja na KIZI.")}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Prefere ajuda? A gente cria sua loja com você, de graça.
-              <span aria-hidden="true"> ↗</span>
-            </a>
+            <p className="hero-promise">Criação gratuita nos dois caminhos · sem compromisso para começar</p>
 
             <ul className="highlight-list">
               {highlights.map((item) => (
@@ -311,16 +371,10 @@ function App() {
               ))}
             </ul>
 
-            <div className="app-preview">
-              <img
-                src="/platform-preview.png"
-                alt="Prévia do painel KIZI para administrar uma loja online"
-              />
-            </div>
           </div>
 
           <section className="signup-card" id="criar">
-            <div className="signup-kicker"><span>Comece agora</span><span>Grátis para começar</span></div>
+            <div className="signup-kicker"><span>Crie em poucos passos</span><span>R$ 0 para começar</span></div>
             <div className="progress">
               <span className={step === "account" ? "active" : "done"}>1</span>
               <div />
@@ -330,9 +384,9 @@ function App() {
             {step === "account" && (
               <div>
                 <div className="card-header">
-                  <span>Crie seu acesso</span>
-                  <h2>Entre com Google</h2>
-                  <p>Um clique para criar sua conta e seguir para o nome da loja.</p>
+                  <span>Opção 1 · faça você mesma</span>
+                  <h2>Comece sua loja agora</h2>
+                  <p>Entre com Google e escolha o nome e o endereço da sua loja. A estrutura fica pronta em até 5 minutos.</p>
                 </div>
 
                 <GoogleButton onCredential={createAccountWithGoogle} />
@@ -342,15 +396,27 @@ function App() {
                     ? "Usamos seu Google apenas para criar o acesso ao painel."
                     : "O acesso com Google será habilitado quando estiver configurado para este ambiente."}
                 </p>
+                <div className="assisted-choice">
+                  <span>Quer pular a configuração?</span>
+                  <p>A gente cria sua loja gratuitamente e entrega em até 1 dia útil.</p>
+                  <a
+                    href={getSupportUrl("Oi! Quero solicitar a criação gratuita da minha loja pela equipe KIZI. Entendi que a entrega é em até 1 dia útil.")}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={() => trackAnalytics("assisted_setup_whatsapp_clicked", { placement: "signup_card" })}
+                  >
+                    Pedir criação grátis pelo WhatsApp <span aria-hidden="true">↗</span>
+                  </a>
+                </div>
               </div>
             )}
 
             {step === "store" && (
               <form onSubmit={createStore}>
                 <div className="card-header">
-                  <span>Agora sua loja</span>
-                  <h2>Nome e endereço</h2>
-                  <p>Escolha onde sua loja vai aparecer.</p>
+                  <span>Quase lá</span>
+                  <h2>Dê um nome à sua loja</h2>
+                  <p>Você pode ajustar os detalhes e cadastrar seus produtos depois, no painel.</p>
                 </div>
 
                 <label>
@@ -379,7 +445,7 @@ function App() {
                 </label>
 
                 <label>
-                  WhatsApp
+                  WhatsApp para contato <span className="optional-label">opcional</span>
                   <input
                     name="whatsapp"
                     value={store.whatsapp}
@@ -394,7 +460,7 @@ function App() {
                 </div>
 
                 <button type="submit" disabled={status.type === "loading"}>
-                  {status.type === "loading" ? "Montando..." : "Criar loja"}
+                  {status.type === "loading" ? "Criando sua loja..." : "Criar minha loja grátis"}
                 </button>
                 <button className="text-button" type="button" onClick={() => setStep("account")}>
                   Voltar
@@ -406,17 +472,26 @@ function App() {
               <div className="done-panel">
                 <div className="success-mark">✓</div>
                 <div className="card-header">
-                  <span>Loja criada</span>
-                  <h2>{createdStore.storeName}</h2>
-                  <p>Agora falta completar sua vitrine no painel.</p>
+                  <span>Seu próximo passo</span>
+                  <h2>Sua loja está no ar.</h2>
+                  <p>{createdStore.storeName} já tem um endereço. Entre no painel para adicionar produtos e publicar sua vitrine.</p>
                 </div>
                 <div className="created-box">
                   <span>Endereço público</span>
                   <strong>{createdStore.domain}</strong>
                 </div>
-                <button type="button" onClick={goToAdmin}>
-                  Entrar no painel
+                <button
+                  type="button"
+                  onClick={() => {
+                    trackAnalytics("admin_handoff_clicked");
+                    goToAdmin();
+                  }}
+                >
+                  Abrir meu painel
                 </button>
+                <a className="done-help-link" href={getSupportUrl(`Oi! Criei a loja ${createdStore.storeName} e quero ajuda para configurar.`)} target="_blank" rel="noreferrer">
+                  Quero ajuda para configurar
+                </a>
               </div>
             )}
 
@@ -433,11 +508,21 @@ function App() {
         </div>
       </section>
 
+      <section className="preview-section" aria-label="Prévia do painel KIZI">
+        <div className="preview-caption">
+          <span>Painel simples de verdade</span>
+          <p>Produtos, pedidos e informações da sua loja em um só lugar.</p>
+        </div>
+        <div className="app-preview">
+          <img src="/platform-preview.png" alt="Painel KIZI para administrar produtos e pedidos da loja" />
+        </div>
+      </section>
+
       <section className="section workflow-section" id="como-funciona">
         <div className="section-header">
-          <span>Sem complicação</span>
-          <h2>Do primeiro passo ao primeiro pedido.</h2>
-          <p>O essencial para colocar sua marca na internet e começar a vender.</p>
+          <span>Você decide o ritmo</span>
+          <h2>Do nome da loja à vitrine, sem complicação.</h2>
+          <p>Em poucos minutos você cria a estrutura. Depois, completa a vitrine quando quiser.</p>
         </div>
 
         <div className="workflow-grid">
@@ -505,7 +590,14 @@ function App() {
                   <li key={feature}>{feature}</li>
                 ))}
               </ul>
-              <a className={plan.featured ? "primary-link" : "secondary-link"} href="#criar">
+              <a
+                className={plan.featured ? "primary-link" : "secondary-link"}
+                href="#criar"
+                onClick={() => trackAnalytics("signup_cta_clicked", {
+                  placement: "pricing",
+                  plan: plan.name.toLowerCase(),
+                })}
+              >
                 {plan.action}
               </a>
             </article>
@@ -533,8 +625,46 @@ function App() {
           <strong>KIZI</strong>
           <p>Uma forma mais simples de levar seu negócio para o digital.</p>
         </div>
-        <a className="primary-link" href="#criar">Criar minha loja</a>
+        <div className="footer-links">
+          <a href="/privacidade.html">Privacidade</a>
+          {hasAnalyticsConfigured() && (
+            <button className="cookie-preferences" type="button" onClick={() => setCookiesVisible(true)}>
+              Preferências de cookies
+            </button>
+          )}
+          <a
+            className="primary-link"
+            href="#criar"
+            onClick={() => trackAnalytics("signup_cta_clicked", { placement: "footer" })}
+          >
+            Criar minha loja
+          </a>
+        </div>
       </footer>
+      {cookiesVisible && (
+        <div className="cookie-banner" role="dialog" aria-label="Preferências de cookies">
+          <p>
+            Usamos cookies essenciais e, se você permitir, métricas do Google Analytics e
+            PostHog para entender o uso do portal e melhorar a experiência. Você pode mudar
+            sua escolha a qualquer momento em Preferências de cookies. <a href="/privacidade.html">Saiba mais</a>.
+          </p>
+          <div className="cookie-actions">
+            <button className="cookie-reject" type="button" onClick={() => updateAnalyticsConsent("rejected")}>
+              Recusar métricas
+            </button>
+            <button type="button" onClick={() => updateAnalyticsConsent("accepted")}>
+              Aceitar métricas
+            </button>
+          </div>
+        </div>
+      )}
+      <a
+        className="mobile-fixed-cta"
+        href="#criar"
+        onClick={() => trackAnalytics("signup_cta_clicked", { placement: "mobile_fixed" })}
+      >
+        Criar minha loja
+      </a>
     </main>
   );
 }

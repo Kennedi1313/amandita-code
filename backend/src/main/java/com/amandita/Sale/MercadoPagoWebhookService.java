@@ -5,7 +5,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -14,6 +16,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Service
 public class MercadoPagoWebhookService {
@@ -79,6 +82,17 @@ public class MercadoPagoWebhookService {
                 pendingSales.size(), reconciled, stillPending, notFound, failedSaleIds.size(), failedSaleIds);
     }
 
+    @Scheduled(fixedDelay = 900000)
+    @Transactional
+    public void cancelExpiredPendingSales() {
+        LocalDateTime expirationLimit = LocalDateTime.now().minusHours(24);
+        List<Sale> expiredSales = saleDao.findExpiredPendingMercadoPagoSales(expirationLimit);
+        for (Sale sale : expiredSales) {
+            sale.setStatus("CANCELADO");
+            saleDao.insertSale(sale);
+        }
+    }
+
     private String findPaymentId(Long storeId, Sale sale) {
         JsonNode searchResult = mercadoPagoOAuthService.requestMerchantApi(
                 storeId,
@@ -134,20 +148,30 @@ public class MercadoPagoWebhookService {
         if (StringUtils.isBlank(webhookSecret)) {
             throw new IllegalStateException("MERCADOPAGO_WEBHOOK_SECRET não configurado.");
         }
-        if (storeId == null || StringUtils.isBlank(dataId) || !dataId.matches("\\d+")) {
+        if (storeId == null) {
             throw new IllegalArgumentException("Notificação Mercado Pago inválida.");
         }
-        verifySignature(dataId, requestId, signature);
 
+        JsonNode notification;
         try {
-            JsonNode notification = objectMapper.readTree(payload);
-            String bodyId = notification.path("data").path("id").asText(dataId);
-            if (!dataId.equals(bodyId)) throw new IllegalArgumentException("ID do pagamento divergente na notificação.");
+            notification = objectMapper.readTree(payload);
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
             throw new IllegalArgumentException("Corpo da notificação inválido.");
         }
+
+        String bodyId = notification.path("data").path("id").asText(null);
+        if (StringUtils.isBlank(dataId)) {
+            dataId = bodyId;
+        } else if (!dataId.equals(bodyId)) {
+            throw new IllegalArgumentException("ID do pagamento divergente na notificação.");
+        }
+        if (StringUtils.isBlank(dataId) || !dataId.matches("\\d+")) {
+            throw new IllegalArgumentException("Notificação Mercado Pago inválida.");
+        }
+
+        verifySignature(dataId, requestId, signature);
 
         JsonNode payment = mercadoPagoOAuthService.requestMerchantApi(
                 storeId, "/v1/payments/" + dataId, "GET", null, null);

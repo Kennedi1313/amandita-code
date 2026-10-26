@@ -6,6 +6,7 @@ public record AddressDTO (
     Long number,
     String district,
     String city,
+    String state,
     String reference
 ){
     public AddressDTO(Address address) {
@@ -15,6 +16,7 @@ public record AddressDTO (
                 address.getNumber(),
                 address.getDistrict(),
                 address.getCity(),
+                address.getState(),
                 address.getReference()
         );
     }

@@ -28,8 +28,19 @@ export interface StoreInfo {
     number?: string;
     district?: string;
     city?: string;
+    state?: string;
     reference?: string;
   } | null;
+  melhorEnvioOriginAddress?: {
+    zip?: string;
+    street?: string;
+    number?: string;
+    district?: string;
+    city?: string;
+    state?: string;
+    reference?: string;
+  } | null;
+  melhorEnvioOriginZip?: string | null;
   localDeliveryEnabled?: boolean;
   localDeliveryFee?: number;
   freeShippingMinAmount?: number;

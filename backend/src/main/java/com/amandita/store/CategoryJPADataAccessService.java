@@ -33,7 +33,8 @@ public class CategoryJPADataAccessService implements CategoryDao {
     }
 
     @Override
-    public Category addCategory(Long storeId, String name) {
+    public Category addCategory(Long storeId, CategoryRequest request) {
+        String name = request.name();
         Store store = storeDao.findById(storeId)
                 .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
         String cleanName = validateName(name);
@@ -42,12 +43,14 @@ public class CategoryJPADataAccessService implements CategoryDao {
         Category category = new Category();
         category.setName(cleanName);
         category.setPath(toPath(cleanName));
+        applyDefaults(category, request);
         category.setStore(store);
         return categoryRepository.save(category);
     }
 
     @Override
-    public Category updateCategory(Long storeId, Long categoryId, String name) {
+    public Category updateCategory(Long storeId, Long categoryId, CategoryRequest request) {
+        String name = request.name();
         Category category = findStoreCategory(storeId, categoryId);
         String cleanName = validateName(name);
         assertUniqueName(storeId, cleanName, categoryId);
@@ -60,6 +63,7 @@ public class CategoryJPADataAccessService implements CategoryDao {
 
         category.setName(cleanName);
         category.setPath(newPath);
+        applyDefaults(category, request);
         Category saved = categoryRepository.save(category);
 
         if (StringUtils.isNotBlank(oldSlug) && !oldSlug.equals(newSlug)) {
@@ -67,6 +71,19 @@ public class CategoryJPADataAccessService implements CategoryDao {
         }
 
         return saved;
+    }
+
+    private void applyDefaults(Category category, CategoryRequest request) {
+        if (request.weightKg() != null && request.weightKg().signum() < 0
+                || request.widthCm() != null && request.widthCm() < 0
+                || request.heightCm() != null && request.heightCm() < 0
+                || request.lengthCm() != null && request.lengthCm() < 0) {
+            throw new IllegalArgumentException("Os padrões de peso e dimensões não podem ser negativos.");
+        }
+        category.setWeightKg(request.weightKg());
+        category.setWidthCm(request.widthCm());
+        category.setHeightCm(request.heightCm());
+        category.setLengthCm(request.lengthCm());
     }
 
     @Override

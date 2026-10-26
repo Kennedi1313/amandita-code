@@ -10,20 +10,25 @@ const normalizeAssetPath = (value: string) => {
   return trimmed.replace(/\.png$/i, "");
 };
 
+const normalizeOptionalBrandAsset = (value: string) =>
+  value === "logos/local" || value === "banners/local" || value === "banners/local_mobile"
+    ? ""
+    : normalizeAssetPath(value);
+
 const normalizeStoreInfo = (storeInfo: StoreInfo): StoreInfo => ({
   ...storeInfo,
-  logoUrl: normalizeAssetPath(storeInfo.logoUrl),
-  bannerUrl: normalizeAssetPath(storeInfo.bannerUrl),
+  logoUrl: normalizeOptionalBrandAsset(storeInfo.logoUrl),
+  bannerUrl: normalizeOptionalBrandAsset(storeInfo.bannerUrl),
   bannerMobileUrl: storeInfo.bannerMobileUrl
-    ? normalizeAssetPath(storeInfo.bannerMobileUrl)
+    ? normalizeOptionalBrandAsset(storeInfo.bannerMobileUrl)
     : "",
-  iconUrl: normalizeAssetPath(storeInfo.iconUrl),
+  iconUrl: normalizeOptionalBrandAsset(storeInfo.iconUrl),
   categories: storeInfo.categories ?? [],
   checkoutEnabled: storeInfo.plan === "COMPLETE" && (
     (storeInfo.pickupEnabled !== false && Boolean(
       storeInfo.pickupAddress?.zip?.trim() && storeInfo.pickupAddress?.street?.trim() &&
       storeInfo.pickupAddress?.number?.trim() && storeInfo.pickupAddress?.district?.trim() &&
-      storeInfo.pickupAddress?.city?.trim(),
+      storeInfo.pickupAddress?.city?.trim() && storeInfo.pickupAddress?.state?.trim(),
     )) ||
     (storeInfo.localDeliveryEnabled !== false && Boolean(
       storeInfo.shippingOriginZip?.replace(/\D/g, "").length === 8 &&

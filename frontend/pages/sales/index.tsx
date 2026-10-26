@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { getSalesByCustomerEmail } from "@/lib/client";
 import { getProductImageUrl } from "@/lib/productClient";
 import { useAuth } from "@/components/Context/authContext";
@@ -25,7 +25,7 @@ const Sales = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const fetchSales = async () => {
+  const fetchSales = useCallback(async () => {
     if (!customer?.username) {
       setLoading(false);
       return;
@@ -42,7 +42,7 @@ const Sales = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [customer?.username]);
 
   const toggleAccordion = (saleId: number) => {
     setExpandedSaleId(expandedSaleId === saleId ? null : saleId);
@@ -50,7 +50,7 @@ const Sales = () => {
 
   useEffect(() => {
     fetchSales();
-  }, [customer?.username]);
+  }, [fetchSales]);
 
   const getStatusClassName = (status: string) => {
     const normalizedStatus = status?.toUpperCase();
@@ -107,6 +107,13 @@ const Sales = () => {
       return FiXCircle;
     }
     return FiClock;
+  };
+
+  const getShippingLabel = (sale: any) => {
+    if (sale.shippingMethod?.startsWith("melhor_envio:")) return "Melhor Envio";
+    if (sale.shippingMethod === "local_delivery") return "Entrega local";
+    if (sale.shippingMethod === "pickup") return "Retirada";
+    return sale.shipment ? "Entrega" : "Retirada";
   };
 
   const parsePriceToCents = (value: any) => {
@@ -250,7 +257,7 @@ const Sales = () => {
                         </p>
                         <p className="font-medium flex gap-2 items-center">
                           <FiTruck />
-                          {sale.shipment ? "Entrega local" : "Retirada"}
+                          {getShippingLabel(sale)}
                         </p>
                         <p className="text-sm text-gray-500">
                           Frete: {sale.shipment
@@ -259,6 +266,11 @@ const Sales = () => {
                               : "Grátis"
                             : "Grátis na retirada"}
                         </p>
+                        {sale.shippingAddress && sale.shippingMethod !== "pickup" && (
+                          <p className="mt-1 text-sm text-gray-500">
+                            {sale.shippingAddress.street}, {sale.shippingAddress.number} - {sale.shippingAddress.district}, {sale.shippingAddress.city}/{sale.shippingAddress.state || "--"} · CEP {sale.shippingZip}
+                          </p>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs uppercase text-gray-500">
@@ -284,7 +296,9 @@ const Sales = () => {
                       )}
                     </div>
 
-                    {sale.status?.toUpperCase() === "ENVIADO" && (
+                    {["ENVIADO", "ENTREGUE"].includes(
+                      sale.status?.toUpperCase(),
+                    ) && (
                       <div className="mb-4 rounded-md border border-blue-100 bg-blue-50 p-3 text-blue-950">
                         <p className="text-xs uppercase text-blue-700">Acompanhamento</p>
                         {sale.melhorEnvioTrackingCode ? (
@@ -296,6 +310,10 @@ const Sales = () => {
                           >
                             Acompanhar pedido · {sale.melhorEnvioTrackingCode}
                           </a>
+                        ) : sale.externalTrackingCode ? (
+                          <p className="mt-1 text-sm">
+                            Código de rastreio: {sale.externalTrackingCode}
+                          </p>
                         ) : sale.shippingMethod?.startsWith("melhor_envio:") ? (
                           <p className="mt-1 text-sm">O código de rastreio ainda não foi disponibilizado.</p>
                         ) : sale.shippingMethod === "local_delivery" ? (

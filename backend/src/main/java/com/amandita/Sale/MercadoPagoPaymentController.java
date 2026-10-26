@@ -14,10 +14,14 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/v1/payment/mercadopago")
 public class MercadoPagoPaymentController {
+    private static final Logger LOGGER = LoggerFactory.getLogger(MercadoPagoPaymentController.class);
+
     private final MercadoPagoCheckoutService checkoutService;
     private final MercadoPagoWebhookService webhookService;
     private final SaleDao saleDao;
@@ -39,15 +43,17 @@ public class MercadoPagoPaymentController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (IllegalStateException e) {
+            LOGGER.warn("Could not start Mercado Pago checkout for store {}: {}", storeId, e.getMessage());
             return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
         } catch (Exception e) {
+            LOGGER.error("Unexpected error starting Mercado Pago checkout for store {}", storeId, e);
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body("Não foi possível iniciar o Checkout Pro.");
         }
     }
 
     @PostMapping("/webhook")
     public ResponseEntity<Void> webhook(@RequestParam(name = "store_id") Long storeId,
-                                        @RequestParam(name = "data.id") String dataId,
+                                        @RequestParam(name = "data.id", required = false) String dataId,
                                         @RequestHeader(name = "x-request-id", required = false) String requestId,
                                         @RequestHeader(name = "x-signature", required = false) String signature,
                                         @RequestBody String payload) {

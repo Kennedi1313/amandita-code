@@ -17,7 +17,7 @@ import {
   errorNotification,
   successNotification,
 } from "../../services/notification.js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getCategories } from "../../services/client.js";
 import { FiSave } from "react-icons/fi";
 import PriceInput from "./PriceInput.jsx";
@@ -35,6 +35,7 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
   const [imagesToDelete, setImagesToDelete] = useState([]);
   const [hasNewThumb, setHasNewThumb] = useState(false);
   const [variationData, setVariationData] = useState([]);
+  const appliedCategoryRef = useRef(initialValues.category || "");
   const [productType, setProductType] = useState(
     initialValues.variations && initialValues.variations.length > 0
       ? "variable"
@@ -175,6 +176,17 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
       }
     },
   });
+
+  useEffect(() => {
+    const selectedCategory = categories.find(
+      (category) => category.path.split("/").pop() === formik.values.category,
+    );
+    if (!selectedCategory || appliedCategoryRef.current === formik.values.category) return;
+    appliedCategoryRef.current = formik.values.category;
+    ["weightKg", "widthCm", "heightCm", "lengthCm"].forEach((field) => {
+      formik.setFieldValue(field, selectedCategory[field] ?? "");
+    });
+  }, [categories, formik.values.category]);
 
   useEffect(() => {
     formik.setFieldValue("variations", variationData);

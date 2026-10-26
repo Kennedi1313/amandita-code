@@ -59,6 +59,9 @@ public class CheckoutProService {
         sale.setShippingMethod(request.getShippingMethod());
         sale.setShippingFee(request.getShippingFee() == null ? 0 : request.getShippingFee().intValue());
         sale.setShippingZip(request.getShippingZip());
+        if (customer != null && customer.getAddresses() != null) {
+            customer.getAddresses().stream().findFirst().ifPresent(sale::snapshotShippingAddress);
+        }
         sale.setShippingQuote(request.getShippingQuote());
         sale.setPaymentMethod(request.getPaymentMethod());
         sale.setStore(store);

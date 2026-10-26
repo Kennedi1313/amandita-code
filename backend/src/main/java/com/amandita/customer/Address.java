@@ -39,6 +39,7 @@ public class Address {
 
     @Column(nullable = false)
     private String city;
+    private String state;
 
     @Column(nullable = false)
     private String reference;
@@ -54,6 +55,9 @@ public class Address {
         this.city = city;
         this.reference = reference;
     }
+
+    public String getState() { return state; }
+    public void setState(String state) { this.state = state; }
 
     public Address(Integer id, Customer customer, String zip, String street, Long number, String district, String city, String reference) {
         this.id = id;

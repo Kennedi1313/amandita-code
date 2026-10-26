@@ -1,6 +1,5 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom/client";
-import Customer from "./Customer.jsx";
 import {
   ChakraProvider,
   Text,
@@ -8,19 +7,27 @@ import {
   extendTheme,
 } from "@chakra-ui/react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
-import Login from "./components/login/Login.jsx";
-import Signup from "./components/signup/Signup";
 import AuthProvider from "./components/context/AuthContext.jsx";
 import ProtectedRoute from "./components/shared/ProtectedRoute.jsx";
 import "./index.css";
-import Home from "./Home.jsx";
-import Product from "./Product.jsx";
-import StoreSettings from "./StoreSettings.jsx";
-import PlanBilling from "./PlanBilling.jsx";
-import Categories from "./Categories.jsx";
-import Profile from "./Profile.jsx";
 import { FavoritesProvider } from "./hooks/use-shopping-favorites.jsx";
 import { PaginationProvider } from "./components/context/PaginationContext.jsx";
+
+const Customer = lazy(() => import("./Customer.jsx"));
+const Home = lazy(() => import("./Home.jsx"));
+const Product = lazy(() => import("./Product.jsx"));
+const StoreSettings = lazy(() => import("./StoreSettings.jsx"));
+const PlanBilling = lazy(() => import("./PlanBilling.jsx"));
+const Categories = lazy(() => import("./Categories.jsx"));
+const Profile = lazy(() => import("./Profile.jsx"));
+const Login = lazy(() => import("./components/login/Login.jsx"));
+const Signup = lazy(() => import("./components/signup/Signup.jsx"));
+
+const withLoadingFallback = (element) => (
+  <Suspense fallback={<Text p={8}>Carregando…</Text>}>
+    {element}
+  </Suspense>
+);
 
 const { ToastContainer } = createStandaloneToast();
 
@@ -76,82 +83,82 @@ const theme = extendTheme({
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Login />,
+    element: withLoadingFallback(<Login />),
   },
   {
     path: "/signup",
-    element: <Signup />,
+    element: withLoadingFallback(<Signup />),
   },
   {
     path: "dashboard",
-    element: (
+    element: withLoadingFallback(
       <ProtectedRoute>
         <Home />
-      </ProtectedRoute>
+      </ProtectedRoute>,
     ),
   },
   {
     path: "dashboard/profile",
-    element: (
+    element: withLoadingFallback(
       <ProtectedRoute>
         <Profile />
-      </ProtectedRoute>
+      </ProtectedRoute>,
     ),
   },
   {
     path: "dashboard/customers",
-    element: (
+    element: withLoadingFallback(
       <ProtectedRoute>
         <Customer />
-      </ProtectedRoute>
+      </ProtectedRoute>,
     ),
   },
   {
     path: "dashboard/products",
-    element: (
+    element: withLoadingFallback(
       <ProtectedRoute>
         <Product />
-      </ProtectedRoute>
+      </ProtectedRoute>,
     ),
   },
       {
         path: "dashboard/store",
-        element: (
+        element: withLoadingFallback(
           <ProtectedRoute>
             <StoreSettings section="store" />
-          </ProtectedRoute>
+          </ProtectedRoute>,
         ),
       },
       {
         path: "dashboard/payments",
-        element: (
+        element: withLoadingFallback(
           <ProtectedRoute>
             <StoreSettings section="payments" />
-          </ProtectedRoute>
+          </ProtectedRoute>,
         ),
       },
       {
         path: "dashboard/plan",
-        element: (
+        element: withLoadingFallback(
           <ProtectedRoute>
             <PlanBilling />
-          </ProtectedRoute>
+          </ProtectedRoute>,
         ),
       },
       {
         path: "dashboard/shipping",
-        element: (
+        element: withLoadingFallback(
           <ProtectedRoute>
             <StoreSettings section="shipping" />
-          </ProtectedRoute>
+          </ProtectedRoute>,
         ),
       },
   {
     path: "dashboard/categories",
-    element: (
+    element: withLoadingFallback(
       <ProtectedRoute>
         <Categories />
-      </ProtectedRoute>
+      </ProtectedRoute>,
     ),
   },
 ]);

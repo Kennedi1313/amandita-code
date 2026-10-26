@@ -12,6 +12,7 @@ public record CustomerUpdateRequest(
         Long number,
         String district,
         String city,
+        String state,
         String reference
 ) {
 }

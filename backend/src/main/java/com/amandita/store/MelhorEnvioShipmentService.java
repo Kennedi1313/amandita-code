@@ -3,7 +3,8 @@ package com.amandita.store;
 import com.amandita.Sale.Sale;
 import com.amandita.Sale.SaleDao;
 import com.amandita.Sale.SaleItem;
-import com.amandita.customer.Address;
+import com.amandita.customer.Customer;
+import com.amandita.customer.CustomerRepository;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -21,21 +22,28 @@ import java.math.BigDecimal;
 public class MelhorEnvioShipmentService {
     private final SaleDao saleDao;
     private final StoreDao storeDao;
+    private final CustomerRepository customerRepository;
     private final String environment;
     private final String userAgent;
 
     public MelhorEnvioShipmentService(
             SaleDao saleDao,
             StoreDao storeDao,
+            CustomerRepository customerRepository,
             @Value("${melhor-envio.environment:sandbox}") String environment,
             @Value("${melhor-envio.user-agent:Amandita (contato@amandita.com.br)}") String userAgent) {
         this.saleDao = saleDao;
         this.storeDao = storeDao;
+        this.customerRepository = customerRepository;
         this.environment = environment;
         this.userAgent = userAgent;
     }
 
     public Sale createLabel(Long saleId, Long storeId) {
+        return createLabel(saleId, storeId, null);
+    }
+
+    public Sale createLabel(Long saleId, Long storeId, String invoiceKey) {
         Sale sale = saleDao.findByIdAndStoreId(saleId, storeId)
                 .orElseThrow(() ->
                         new IllegalArgumentException("Pedido não encontrado."));
@@ -81,60 +89,70 @@ public class MelhorEnvioShipmentService {
                     "O Melhor Envio não está conectado nesta loja.");
         }
 
-        PickupAddress origin = store.getPickupAddress();
+        PickupAddress origin = store.getMelhorEnvioOriginAddress();
 
         if (origin == null || StringUtils.isAnyBlank(
                 origin.zip(), origin.street(), origin.number(),
-                origin.district(), origin.city())) {
+                origin.district(), origin.city(), origin.state())) {
             throw new IllegalStateException(
-                    "Cadastre o endereço de retirada antes de gerar a etiqueta.");
+                    "O endereço de postagem do Melhor Envio não foi sincronizado. "
+                            + "Acesse Configurações > Melhor Envio, confirme o endereço autorizado e reconecte a conta antes de gerar a etiqueta.");
         }
 
-        if (StringUtils.isBlank(store.getOwnerDocument())) {
-            throw new IllegalStateException(
-                    "Cadastre o CPF/CNPJ do remetente antes de gerar a etiqueta.");
+        String ownerDocument = onlyDigits(store.getTaxDocument());
+        if (StringUtils.isBlank(ownerDocument)) {
+            Customer storeOwner = customerRepository.findFirstByOwnedStoreId(storeId)
+                    .orElseThrow(() -> new IllegalStateException("Cadastre o CNPJ da loja antes de usar NF-e."));
+            ownerDocument = onlyDigits(storeOwner.getCpf());
+        }
+        if (ownerDocument.length() != 14 && StringUtils.isNotBlank(invoiceKey)) {
+            throw new IllegalStateException("Cadastre um CNPJ válido da loja antes de gerar etiqueta com NF-e.");
         }
 
-        if (sale.getCustomer() == null
-                || sale.getCustomer().getAddresses() == null) {
+        if (StringUtils.isAnyBlank(sale.getShippingAddressStreet(), sale.getShippingAddressDistrict(),
+                sale.getShippingAddressCity(), sale.getShippingAddressState(), sale.getShippingZip())
+                || sale.getShippingAddressNumber() == null) {
             throw new IllegalStateException(
-                    "O cliente não possui endereço de entrega.");
+                    "Este pedido não possui o endereço de entrega salvo na compra.");
         }
-
-        Address destination = sale.getCustomer().getAddresses()
-                .stream()
-                .filter(java.util.Objects::nonNull)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "O cliente não possui endereço de entrega."));
 
         JSONObject quote = new JSONObject(
                 StringUtils.defaultString(sale.getShippingQuote(), "{}"));
 
         JSONObject from = addressPayload(
-                origin.street(),
-                origin.number(),
-                origin.district(),
-                origin.city(),
-                origin.zip(),
-                store.getName(),
-                store.getOwnerDocument()
+            origin.street(),
+            origin.number(),
+            "",
+            origin.district(),
+            origin.city(),
+            origin.state(),
+            origin.zip(),
+            store.getName(),
+            ownerDocument,
+            "",
+            "",
+            ownerDocument.length() == 14 ? "ISENTO" : "",
+            ""
         );
 
         JSONObject to = addressPayload(
-                destination.getStreet(),
-                String.valueOf(destination.getNumber()),
-                destination.getDistrict(),
-                destination.getCity(),
-                destination.getZip(),
-                sale.getCustomer().getName(),
-                sale.getCustomer().getCpf()
+                sale.getShippingAddressStreet(),
+                String.valueOf(sale.getShippingAddressNumber()),
+                "",
+                sale.getShippingAddressDistrict(),
+                sale.getShippingAddressCity(),
+                sale.getShippingAddressState(),
+                sale.getShippingZip(),
+                sale.getCustomer() == null ? "" : sale.getCustomer().getName(),
+                sale.getCustomer() == null ? "" : sale.getCustomer().getCpf(),
+                sale.getCustomer() == null ? "" : sale.getCustomer().getPhone(),
+                sale.getCustomer() == null ? "" : sale.getCustomer().getEmail(),
+                "",
+                ""
         );
 
         // Non-commercial shipment: no invoice is sent.
         // Confirm the sender is eligible for this shipment type.
-        from.put("state_register", "ISENTO");
-
         BigDecimal insuranceValue = BigDecimal.ZERO;
         for (SaleItem item : sale.getSaleItems()) {
             insuranceValue = insuranceValue.add(
@@ -148,20 +166,31 @@ public class MelhorEnvioShipmentService {
                     "O valor declarado dos produtos deve ser maior que zero.");
         }
 
+        String normalizedInvoiceKey = StringUtils.trimToEmpty(invoiceKey).replaceAll("\\D", "");
+        if (StringUtils.isNotBlank(invoiceKey) && normalizedInvoiceKey.length() != 44) {
+            throw new IllegalStateException("A chave da NF-e deve conter 44 dígitos.");
+        }
         JSONObject options = new JSONObject()
-                .put("non_commercial", true)
-                .put("insurance_value", insuranceValue)
-                .put("receipt", false)
-                .put("own_hand", false)
-                .put("reverse", false);
+            .put("non_commercial", StringUtils.isBlank(normalizedInvoiceKey))
+            .put("reverse", false)
+            .put("insurance_value", insuranceValue)
+            .put("receipt", false)
+            .put("own_hand", false)
+            .put("collect", false)
+            .put("reminder", "");
+        if (StringUtils.isNotBlank(normalizedInvoiceKey)) {
+            options.remove("non_commercial");
+            options.put("invoice", new JSONObject().put("key", normalizedInvoiceKey));
+        }
 
         JSONObject payload = new JSONObject()
-                .put("service", serviceId)
                 .put("from", from)
                 .put("to", to)
-                .put("products", productsPayload(sale))
+                .put("options", options)
+                .put("service", serviceId)
                 .put("volumes", volumesPayload(sale))
-                .put("options", options);
+                .put("frequent_destination_id", "")
+                .put("products", productsPayload(sale));
 
         // Avoid logging CPF/CNPJ and complete addresses in production.
         JSONObject cartResponse = post(store, "/api/v2/me/cart", payload);
@@ -194,6 +223,7 @@ public class MelhorEnvioShipmentService {
 
         sale.setMelhorEnvioShipmentId(orderId);
         sale.setMelhorEnvioStatus("GENERATED");
+        sale.setMelhorEnvioInvoiceKey(StringUtils.isBlank(normalizedInvoiceKey) ? null : normalizedInvoiceKey);
         sale.setMelhorEnvioTrackingCode(quote.optString("tracking", null));
 
         return saleDao.insertSale(sale);
@@ -234,73 +264,71 @@ public class MelhorEnvioShipmentService {
     }
 
     private JSONObject addressPayload(
-            String street,
-            String number,
-            String district,
-            String city,
-            String zip,
-            String name,
-            String document) {
+        String street,
+        String number,
+        String complement,
+        String district,
+        String city,
+        String stateAbbr,
+        String zip,
+        String name,
+        String document,
+        String phone,
+        String email,
+        String stateRegister,
+        String economicActivityCode) {
 
-        if (StringUtils.isAnyBlank(street, number, district, city, zip)) {
-            throw new IllegalStateException(
-                    "O endereço precisa ter rua, número, bairro, cidade e CEP."
-            );
+        if (StringUtils.isAnyBlank(
+                street, number, district, city, stateAbbr, zip)) {
+                throw new IllegalStateException(
+                        "O endereço precisa ter rua, número, bairro, cidade, UF e CEP.");
         }
 
         String postalCode = zip.replaceAll("\\D", "");
         if (postalCode.length() != 8) {
-            throw new IllegalStateException("O CEP deve conter 8 dígitos.");
+                throw new IllegalStateException(
+                        "O CEP deve conter 8 dígitos.");
         }
 
-        String normalizedCity = city.trim();
-        String stateAbbr = null;
-
-        // Accept city values such as "Natal - RN" and split the state.
-        java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("(?i)^(.+?)\\s*[-/]\\s*([A-Z]{2})$")
-                .matcher(normalizedCity);
-
-        if (matcher.matches()) {
-            normalizedCity = matcher.group(1).trim();
-            stateAbbr = matcher.group(2).toUpperCase(java.util.Locale.ROOT);
-        }
+        String digits = onlyDigits(document);
 
         JSONObject address = new JSONObject()
-                .put("name", StringUtils.defaultIfBlank(name, "Amandita").trim())
+                .put("name", StringUtils.defaultString(name).trim())
+                .put("phone", StringUtils.defaultString(phone))
+                .put("postal_code", postalCode)
                 .put("address", street.trim())
                 .put("number", number.trim())
+                .put("complement", StringUtils.defaultString(complement))
                 .put("district", district.trim())
-                .put("city", normalizedCity)
-                .put("postal_code", postalCode);
+                .put("city", city.trim())
+                .put("state_abbr", stateAbbr.trim().toUpperCase(
+                        java.util.Locale.ROOT))
+                .put("email", StringUtils.defaultString(email));
 
-        if (stateAbbr != null) {
-            address.put("state_abbr", stateAbbr);
-        }
-
-        String digits = StringUtils.defaultString(document)
-                .replaceAll("\\D", "");
-
-        if (!digits.isEmpty()) {
-            if (digits.length() == 11) {
+        if (digits.length() == 11) {
                 address.put("document", digits);
-            } else if (digits.length() == 14) {
+        } else if (digits.length() == 14) {
                 address.put("company_document", digits);
-            } else {
+                address.put("state_register", StringUtils.defaultString(stateRegister));
+                if (StringUtils.isNotBlank(economicActivityCode)) {
+                        address.put("economic_activity_code", economicActivityCode);
+                }
+        } else {
                 throw new IllegalStateException(
-                        "O CPF/CNPJ do remetente ou destinatário é inválido."
-                );
-            }
+                        "O CPF/CNPJ do remetente ou destinatário é inválido.");
         }
 
         return address;
     }
 
+    private String onlyDigits(String value) {
+        return StringUtils.defaultString(value).replaceAll("\\D", "");
+    }
+
     private JSONArray productsPayload(Sale sale) {
         if (sale.getSaleItems() == null || sale.getSaleItems().isEmpty()) {
             throw new IllegalStateException(
-                    "O pedido precisa ter pelo menos um produto."
-            );
+                    "O pedido precisa ter pelo menos um produto.");
         }
 
         JSONArray products = new JSONArray();
@@ -308,8 +336,7 @@ public class MelhorEnvioShipmentService {
         for (SaleItem item : sale.getSaleItems()) {
             if (item == null || item.getProduct() == null) {
                 throw new IllegalStateException(
-                        "Existe um item sem produto associado."
-                );
+                        "Existe um item sem produto associado.");
             }
 
             var product = item.getProduct();
@@ -319,13 +346,12 @@ public class MelhorEnvioShipmentService {
                     || item.getPrice() == null
                     || item.getPrice() < 0) {
                 throw new IllegalStateException(
-                        "Verifique o nome, a quantidade e o preço dos produtos."
-                );
+                        "Verifique o nome, a quantidade e o preço dos produtos.");
             }
 
             products.put(new JSONObject()
                     .put("name", product.getName().trim())
-                    .put("quantity", item.getQuantity())
+                    .put("quantity", String.valueOf(item.getQuantity()))
                     .put("unitary_value", valueInReais(item.getPrice())));
         }
 
@@ -335,8 +361,7 @@ public class MelhorEnvioShipmentService {
     private JSONArray volumesPayload(Sale sale) {
         if (sale.getSaleItems() == null || sale.getSaleItems().isEmpty()) {
             throw new IllegalStateException(
-                    "O pedido precisa ter pelo menos um item para envio."
-            );
+                    "O pedido precisa ter pelo menos um item para envio.");
         }
 
         BigDecimal weight = BigDecimal.ZERO;
@@ -347,8 +372,7 @@ public class MelhorEnvioShipmentService {
         for (SaleItem item : sale.getSaleItems()) {
             if (item == null || item.getProduct() == null) {
                 throw new IllegalStateException(
-                        "Existe um item sem produto associado."
-                );
+                        "Existe um item sem produto associado.");
             }
 
             var product = item.getProduct();
@@ -358,8 +382,7 @@ public class MelhorEnvioShipmentService {
                     || product.getHeightCm() == null
                     || product.getLengthCm() == null) {
                 throw new IllegalStateException(
-                        "Todos os produtos precisam ter peso e dimensões cadastrados."
-                );
+                        "Todos os produtos precisam ter peso e dimensões cadastrados.");
             }
 
             int quantity = item.getQuantity();
@@ -370,8 +393,7 @@ public class MelhorEnvioShipmentService {
                     || product.getHeightCm() <= 0
                     || product.getLengthCm() <= 0) {
                 throw new IllegalStateException(
-                        "O peso, as dimensões e as quantidades devem ser positivos."
-                );
+                        "O peso, as dimensões e as quantidades devem ser positivos.");
             }
 
             weight = weight.add(product.getWeightKg()
@@ -382,33 +404,57 @@ public class MelhorEnvioShipmentService {
 
             height = Math.addExact(
                     height,
-                    Math.multiplyExact(product.getHeightCm(), quantity)
-            );
+                    Math.multiplyExact(product.getHeightCm(), quantity));
         }
 
-        return new JSONArray().put(new JSONObject()
-                .put("weight", weight)
-                .put("width", width)
-                .put("height", height)
-                .put("length", length));
+        JSONObject volume = new JSONObject()
+                .put("height", String.valueOf(height))
+                .put("width", String.valueOf(width))
+                .put("length", String.valueOf(length))
+                .put("weight", weight.doubleValue());
+
+        return new JSONArray().put(volume);
     }
 
     private JSONObject post(Store store, String path, JSONObject payload) {
-        System.out.println("Melhor envio payload: " + payload.toString(2));
-        System.out.println("Bearer " + store.getMelhorEnvioAccessToken());
-        System.out.println("Path: " + apiBaseUrl() + path);
-        Request request = new Request.Builder().url(apiBaseUrl() + path)
-                .post(okhttp3.RequestBody.create(payload.toString(), MediaType.parse("application/json")))
-                .addHeader("Authorization", "Bearer " + store.getMelhorEnvioAccessToken())
-                .addHeader("Accept", "application/json")
-                .addHeader("Content-Type", "application/json")
-                .addHeader("User-Agent", userAgent).build();
+        Request request = new Request.Builder()
+            .url(apiBaseUrl() + path)
+            .post(okhttp3.RequestBody.create(
+                    payload.toString(),
+                    MediaType.parse("application/json")))
+            .addHeader(
+                    "Authorization",
+                    "Bearer " + store.getMelhorEnvioAccessToken())
+            .addHeader("Accept", "application/json")
+            .addHeader("Content-Type", "application/json")
+            .addHeader("User-Agent", userAgent)
+            .addHeader("me-buy-origin", "calculator-dash")
+            .addHeader("me-buy-type", "simple")
+            .build();
+
         try (Response response = new OkHttpClient().newCall(request).execute()) {
-            String body = response.body() == null ? "{}" : response.body().string();
-            if (!response.isSuccessful()) throw new IllegalStateException("Melhor Envio recusou a operação: " + body + " (HTTP " + response.code() + ")");
+
+            String body = response.body() == null
+                    ? ""
+                    : response.body().string();
+
+            if (!response.isSuccessful()) {
+                throw new IllegalStateException(
+                        "Erro Melhor Envio"
+                        + " | HTTP: " + response.code()
+                        + " | Resposta: " + body);
+            }
+
+            if (body.isBlank()) {
+                return new JSONObject();
+            }
+
             return new JSONObject(body);
+
         } catch (IOException exception) {
-            throw new IllegalStateException("Não foi possível comunicar com o Melhor Envio.", exception);
+            throw new IllegalStateException(
+                    "Falha de comunicação com o Melhor Envio.",
+                    exception);
         }
     }
 

@@ -27,9 +27,15 @@ import {
 const Categories = () => {
   const [categories, setCategories] = useState([]);
   const [newCategoryName, setNewCategoryName] = useState("");
+  const [newDefaults, setNewDefaults] = useState({ weightKg: "", widthCm: "", heightCm: "", lengthCm: "" });
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [editingName, setEditingName] = useState("");
+  const [editingDefaults, setEditingDefaults] = useState({});
+
+  const defaultsPayload = (defaults) => Object.fromEntries(
+    Object.entries(defaults).map(([key, value]) => [key, value === "" ? null : Number(value)]),
+  );
 
   const fetchCategories = async () => {
     try {
@@ -53,9 +59,10 @@ const Categories = () => {
     if (!newCategoryName.trim()) return;
 
     try {
-      const response = await createCategory(newCategoryName.trim());
+      const response = await createCategory({ name: newCategoryName.trim(), ...defaultsPayload(newDefaults) });
       setCategories((current) => [...current, response.data]);
       setNewCategoryName("");
+      setNewDefaults({ weightKg: "", widthCm: "", heightCm: "", lengthCm: "" });
       successNotification("Categoria criada", "A vitrine já usa essa categoria.");
     } catch (err) {
       errorNotification(
@@ -84,7 +91,7 @@ const Categories = () => {
   const handleUpdateCategory = async (categoryId) => {
     if (!editingName.trim()) return;
     try {
-      const response = await updateCategory(categoryId, editingName.trim());
+      const response = await updateCategory(categoryId, { name: editingName.trim(), ...defaultsPayload(editingDefaults) });
       setCategories((current) => current.map((category) =>
         category.id === categoryId ? response.data : category,
       ));
@@ -143,8 +150,14 @@ const Categories = () => {
                 </Button>
               </SimpleGrid>
               <Text color="gray.500" fontSize="sm">
-                O endereço da categoria é criado automaticamente.
+                Os campos abaixo serão usados como padrão nos novos produtos dessa categoria.
               </Text>
+              <SimpleGrid columns={{ base: 2, md: 4 }} spacing={2}>
+                {[["weightKg", "Peso (kg)"], ["widthCm", "Largura (cm)"], ["heightCm", "Altura (cm)"], ["lengthCm", "Comprimento (cm)"]].map(([key, label]) => (
+                  <Input key={key} type="number" step={key === "weightKg" ? "0.001" : "1"} placeholder={label}
+                    value={newDefaults[key]} onChange={(event) => setNewDefaults({ ...newDefaults, [key]: event.target.value })} />
+                ))}
+              </SimpleGrid>
             </Stack>
           </Box>
 
@@ -184,12 +197,20 @@ const Categories = () => {
                 p={2}
               >
                 {editingId === category.id ? (
-                  <Input
+                  <Stack spacing={2}>
+                    <Input
                     size="sm"
                     value={editingName}
                     onChange={(event) => setEditingName(event.target.value)}
                     autoFocus
-                  />
+                    />
+                    <SimpleGrid columns={2} spacing={1}>
+                      {[["weightKg", "Peso"], ["widthCm", "Largura"], ["heightCm", "Altura"], ["lengthCm", "Comprimento"]].map(([key, label]) => (
+                        <Input key={key} size="sm" type="number" placeholder={label} value={editingDefaults[key] ?? ""}
+                          onChange={(event) => setEditingDefaults({ ...editingDefaults, [key]: event.target.value })} />
+                      ))}
+                    </SimpleGrid>
+                  </Stack>
                 ) : (
                   <Text fontWeight="semibold" px={2} noOfLines={1}>
                     {category.name}
@@ -240,6 +261,7 @@ const Categories = () => {
                       onClick={() => {
                         setEditingId(category.id);
                         setEditingName(category.name);
+                        setEditingDefaults({ weightKg: category.weightKg ?? "", widthCm: category.widthCm ?? "", heightCm: category.heightCm ?? "", lengthCm: category.lengthCm ?? "" });
                       }}
                     >
                       Editar

@@ -24,6 +24,7 @@ import {
   updateCustomer,
   updateStoreInfo,
   uploadCustomerProfilePicture,
+  deleteStore,
 } from "./services/client.js";
 import {
   errorNotification,
@@ -44,6 +45,8 @@ const emptyProfile = {
 const Profile = () => {
   const { customer } = useAuth();
   const [profile, setProfile] = useState(emptyProfile);
+  const [initialProfile, setInitialProfile] = useState(emptyProfile);
+  const [initialAddress, setInitialAddress] = useState(null);
   const [store, setStore] = useState({ instagram: "", whatsapp: "" });
   const [address, setAddress] = useState({
     zip: "",
@@ -56,6 +59,8 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deletingStore, setDeletingStore] = useState(false);
+  const { logOut } = useAuth();
 
   useEffect(() => {
     if (!customer?.username) {
@@ -65,8 +70,8 @@ const Profile = () => {
     Promise.all([getCustomerByEmail(customer?.username), getStoreInfo()])
       .then(([customerResponse, storeResponse]) => {
         const customerData = customerResponse.data;
-        setAddress(customerData.addresses?.[0] || address);
-        setProfile({
+        const loadedAddress = customerData.addresses?.[0] || address;
+        const loadedProfile = {
           id: customerData.id,
           name: customerData.name || "",
           email: customerData.email || "",
@@ -75,7 +80,12 @@ const Profile = () => {
           instagram: storeResponse.data.instagram || "",
           whatsapp: storeResponse.data.whatsapp || "",
           storeName: storeResponse.data.name || "",
-        });
+          taxDocument: storeResponse.data.taxDocument || "",
+        };
+        setAddress(loadedAddress);
+        setInitialAddress(loadedAddress);
+        setProfile(loadedProfile);
+        setInitialProfile(loadedProfile);
         setStore(storeResponse.data);
       })
       .catch((error) => {
@@ -95,22 +105,30 @@ const Profile = () => {
     event.preventDefault();
     setSaving(true);
     try {
-      await updateCustomer(profile.id, {
-        name: profile.name,
-        email: profile.email,
-        age: 18,
-        role: null,
-        cpf: profile.cpf,
-        phone: profile.phone,
-        ...address,
-      });
+      const customerFieldsChanged = ["name", "email", "cpf", "phone"].some(
+        (field) => profile[field] !== initialProfile[field],
+      ) || JSON.stringify(address) !== JSON.stringify(initialAddress);
+      if (customerFieldsChanged) {
+        await updateCustomer(profile.id, {
+          name: profile.name,
+          email: profile.email,
+          age: 18,
+          role: null,
+          cpf: profile.cpf,
+          phone: profile.phone,
+          ...address,
+        });
+      }
       const storeResponse = await updateStoreInfo({
         ...store,
         name: profile.storeName,
         instagram: profile.instagram,
         whatsapp: profile.whatsapp,
+        taxDocument: profile.taxDocument,
       });
       setStore(storeResponse.data);
+      setInitialProfile(profile);
+      setInitialAddress(address);
       successNotification("Perfil atualizado", "Seus dados foram salvos com sucesso.");
     } catch (error) {
       errorNotification(
@@ -136,6 +154,28 @@ const Profile = () => {
       errorNotification("Não foi possível atualizar a foto", "Tente novamente.");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleDeleteStore = async () => {
+    const confirmation = window.prompt(
+      "Esta ação é IRREVERSÍVEL. Digite DELETAR para apagar a loja, produtos, pedidos, clientes e imagens:",
+    );
+    if (confirmation !== "DELETAR") return;
+
+    setDeletingStore(true);
+    try {
+      await deleteStore();
+      logOut();
+      window.localStorage.removeItem("store_domain");
+      window.location.href = import.meta.env.VITE_PORTAL_URL || "http://localhost:5174";
+    } catch (error) {
+      errorNotification(
+        "Não foi possível excluir a loja",
+        error.response?.data?.message || "Tente novamente em instantes.",
+      );
+    } finally {
+      setDeletingStore(false);
     }
   };
 
@@ -176,6 +216,22 @@ const Profile = () => {
             </Stack>
           </Box>
 
+          <Box border="1px solid" borderColor="red.200" bg="red.50" borderRadius="2xl" p={{ base: 3, sm: 5 }}>
+            <Heading size="md" color="red.700">Excluir loja</Heading>
+            <Text color="red.700" fontSize="sm" mt={2}>
+              Esta ação é permanente. A loja, produtos, pedidos, clientes vinculados e imagens serão removidos do banco de dados e do armazenamento.
+            </Text>
+            <Button
+              mt={4}
+              colorScheme="red"
+              variant="outline"
+              onClick={handleDeleteStore}
+              isLoading={deletingStore}
+            >
+              Excluir minha loja definitivamente
+            </Button>
+          </Box>
+
           <Box bg="white" borderWidth="1px" borderColor="gray.200" borderRadius="2xl" p={{ base: 3, sm: 5 }} shadow="sm">
             <Heading size="md">Informações pessoais</Heading>
             <Text color="gray.600" fontSize="sm" mt={1}>Mantenha seus dados de contato atualizados.</Text>
@@ -186,6 +242,7 @@ const Profile = () => {
               <FormControl><FormLabel>CPF</FormLabel><Input value={profile.cpf} onChange={(event) => updateField("cpf", event.target.value)} /></FormControl>
               <FormControl><FormLabel>Telefone/WhatsApp pessoal</FormLabel><Input value={profile.phone} onChange={(event) => updateField("phone", event.target.value)} /></FormControl>
               <FormControl><FormLabel>Nome da loja</FormLabel><Input value={profile.storeName} onChange={(event) => updateField("storeName", event.target.value)} /></FormControl>
+              <FormControl><FormLabel>CNPJ da loja (opcional)</FormLabel><Input value={profile.taxDocument || ""} onChange={(event) => updateField("taxDocument", event.target.value.replace(/\D/g, "").slice(0, 14))} placeholder="00.000.000/0000-00" inputMode="numeric" maxLength={18} /></FormControl>
             </SimpleGrid>
           </Box>
 

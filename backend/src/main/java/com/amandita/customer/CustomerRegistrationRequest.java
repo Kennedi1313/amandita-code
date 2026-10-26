@@ -14,6 +14,7 @@ public record CustomerRegistrationRequest(
         Long number,
         String district,
         String city,
+        String state,
         String reference
 ) {
 }

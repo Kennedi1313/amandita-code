@@ -1,9 +1,6 @@
 package com.amandita.Sale;
 
 import com.amandita.customer.Customer;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.mercadopago.exceptions.MPApiException;
-import com.mercadopago.exceptions.MPException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;

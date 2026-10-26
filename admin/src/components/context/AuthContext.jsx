@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   login as performLogin,
   loginWithGoogle as performGoogleLogin,
@@ -12,6 +12,7 @@ const normalizeAccessToken = (token) =>
 
 const AuthProvider = ({ children }) => {
   const [customer, setCustomer] = useState(null);
+  const handoffHandledRef = useRef(false);
 
   const applyToken = (token) => {
     const normalizedToken = normalizeAccessToken(token);
@@ -49,7 +50,16 @@ const AuthProvider = ({ children }) => {
       if (event.data?.type !== "MOSTRA_DIGITAL_ADMIN_TOKEN") {
         return;
       }
+      if (handoffHandledRef.current) {
+        return;
+      }
+
+      handoffHandledRef.current = true;
       applyToken(event.data.token);
+      window.opener?.postMessage(
+        { type: "MOSTRA_DIGITAL_ADMIN_TOKEN_ACCEPTED" },
+        event.origin,
+      );
       window.history.replaceState({}, "", window.location.pathname);
       window.location.href = "/dashboard";
     };

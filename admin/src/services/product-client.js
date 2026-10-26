@@ -45,10 +45,10 @@ export const updateSale = async (details) => {
   }
 };
 
-export const createMelhorEnvioLabel = async (saleId) => {
+export const createMelhorEnvioLabel = async (saleId, invoiceKey) => {
   return await axios.post(
     `${getUrl()}/api/v1/melhorenvio/sales/${saleId}/label`,
-    {},
+    invoiceKey ? { invoiceKey } : {},
     getAuthConfig(),
   );
 };

@@ -1,6 +1,6 @@
 import { useAuth } from "@/components/Context/authContext";
 import ProtectedRoute from "../protectedRoute";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import * as Yup from "yup";
 import { getCustomerByEmail, updateCustomer } from "@/lib/client";
 import toast from "react-hot-toast";
@@ -19,6 +19,7 @@ import {
 import Loading from "@/components/loading";
 import { getApiBaseUrl } from "@/lib/productClient";
 import { useRouter } from "next/router";
+import Image from "next/image";
 
 const Account = () => {
   const { customer, logOut } = useAuth();
@@ -37,6 +38,7 @@ const Account = () => {
       number: Yup.number().min(1, "Obrigatório").required("Obrigatório"),
       district: Yup.string().required("Obrigatório"),
       city: Yup.string().required("Obrigatório"),
+      state: Yup.string().length(2, "Use a sigla do estado").required("Obrigatório"),
     }),
   );
   const [initialValues, setInitialValues] = useState<CustomerForm>({
@@ -50,6 +52,7 @@ const Account = () => {
     number: 0,
     district: "",
     city: "",
+    state: "",
     reference: "",
   });
   const redirectAfterOnboarding =
@@ -58,7 +61,7 @@ const Account = () => {
     !router.query.redirect.startsWith("//")
       ? router.query.redirect
       : "/account";
-  const fetchCustomers = () => {
+  const fetchCustomers = useCallback(() => {
     if (!customer?.username) {
       return;
     }
@@ -77,6 +80,7 @@ const Account = () => {
             number: values.addresses[0].number,
             district: values.addresses[0].district,
             city: values.addresses[0].city,
+            state: values.addresses[0].state || "",
             reference: values.addresses[0].reference,
           });
         } else {
@@ -91,6 +95,7 @@ const Account = () => {
             number: 0,
             district: "",
             city: "",
+            state: "",
             reference: "",
           });
         }
@@ -98,7 +103,7 @@ const Account = () => {
       .catch((err) => {
         (console.log(err), toast(err.code, err));
       });
-  };
+  }, [customer?.username]);
 
   const onSubmit = (values: any) => {
     const customerId = initialValues.id;
@@ -114,6 +119,7 @@ const Account = () => {
       number: values.number,
       district: values.district,
       city: values.city,
+      state: values.state,
       reference: values.reference,
     };
     updateCustomer(customerId, updateRequest)
@@ -134,7 +140,7 @@ const Account = () => {
     if (customer?.username) {
       fetchCustomers();
     }
-  }, [customer?.username]);
+  }, [customer?.username, fetchCustomers]);
 
   if (initialValues.name === "") {
     return <Loading />;
@@ -176,9 +182,12 @@ const Account = () => {
             <div className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gray-900 text-xl font-semibold text-white">
               <span>{initialValues.name.charAt(0).toUpperCase()}</span>
               {initialValues.id && (
-                <img
+                <Image
                   src={`${getApiBaseUrl()}/customers/${initialValues.id}/profile-image`}
                   alt=""
+                  width={56}
+                  height={56}
+                  unoptimized
                   className="absolute inset-0 h-full w-full rounded-full object-cover"
                   onError={(event) => {
                     event.currentTarget.style.display = "none";

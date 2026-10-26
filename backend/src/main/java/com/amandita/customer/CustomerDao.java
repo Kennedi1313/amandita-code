@@ -17,6 +17,7 @@ public interface CustomerDao {
     void deleteCustomerById(Integer customerId);
     void updateCustomer(Customer update);
     Optional<Customer> selectUserByEmailByStore(String email, Long storeId);
+    Optional<Customer> selectCustomerByEmailByStore(String email, Long storeId);
     Optional<Customer> selectUserByEmail(String email);
     Optional<Customer> selectAdminByEmail(String email);
     boolean existsAdminByEmail(String email);

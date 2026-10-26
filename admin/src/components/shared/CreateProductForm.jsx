@@ -14,7 +14,7 @@ import {
   successNotification,
   errorNotification,
 } from "../../services/notification.js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormik } from "formik";
 import { getCategories } from "../../services/client.js";
 import { FiPlus } from "react-icons/fi";
@@ -33,6 +33,7 @@ const CreateProductForm = ({ fetchProducts }) => {
   const [hasNewThumb, setHasNewThumb] = useState(false);
   const [categories, setCategories] = useState([]);
   const [variationData, setVariationData] = useState([]);
+  const appliedCategoryRef = useRef("");
 
   const priceToCents = (value) => Number(String(value || "").replace(/\D/g, ""));
 
@@ -162,6 +163,17 @@ const CreateProductForm = ({ fetchProducts }) => {
         });
     },
   });
+
+  useEffect(() => {
+    const selectedCategory = categories.find(
+      (category) => category.path.split("/").pop() === formik.values.category,
+    );
+    if (!selectedCategory || appliedCategoryRef.current === formik.values.category) return;
+    appliedCategoryRef.current = formik.values.category;
+    ["weightKg", "widthCm", "heightCm", "lengthCm"].forEach((field) => {
+      formik.setFieldValue(field, selectedCategory[field] ?? "");
+    });
+  }, [categories, formik.values.category]);
 
   return (
     <>

@@ -55,44 +55,53 @@ export default function App({ Component, pageProps }: AppProps) {
       router.events.off("routeChangeStart", handleRouteChange);
       router.events.off("routeChangeComplete", handleRouteComplete);
     };
-  }, []);
+  }, [router.events]);
   const storeInfo = useStoreInfo();
-  if (!storeInfo) return null;
+  const isNotFoundPage = router.pathname === "/404";
+  if (!storeInfo && !isNotFoundPage) return null;
+  const isProductPage = router.pathname === "/details/[id]";
   return (
     <>
       <Head>
-        <title>
-          {storeInfo.name} | @{storeInfo.instagram}
-        </title>
-        <link
-          rel="icon"
-          href={
-            storeInfo.iconUrl.match(/^https?:\/\//i)
-              ? storeInfo.iconUrl
-              : "/" + storeInfo.iconUrl + ".png"
-          }
-        />
+        {!isNotFoundPage && storeInfo && !isProductPage ? (
+          <>
+            <title>{storeInfo.name} | Loja online</title>
+            <meta
+              name="description"
+              content={`Conheça a ${storeInfo.name}, veja produtos, novidades e formas de comprar online.`}
+            />
+            <link
+              rel="canonical"
+              href={`https://${storeInfo.domain}${router.asPath.split("?")[0]}`}
+            />
+            <meta property="og:type" content="website" />
+            <meta property="og:title" content={`${storeInfo.name} | Loja online`} />
+            <meta
+              property="og:description"
+              content={`Conheça a ${storeInfo.name}, veja produtos e compre online.`}
+            />
+            <meta
+              property="og:url"
+              content={`https://${storeInfo.domain}${router.asPath.split("?")[0]}`}
+            />
+            {storeInfo.logoUrl ? (
+              <meta property="og:image" content={storeInfo.logoUrl} />
+            ) : null}
+          </>
+        ) : null}
+        {storeInfo && !isNotFoundPage ? (
+          <link
+            rel="icon"
+            href={
+              storeInfo.iconUrl.match(/^https?:\/\//i)
+                ? storeInfo.iconUrl
+                : "/" + storeInfo.iconUrl + ".png"
+            }
+          />
+        ) : null}
       </Head>
       <HelmetProvider>
         <Helmet>
-          <meta
-            name="description"
-            content="Clique e conheça a mais nova loja de joias em prata 925 de Natal/RN!"
-          />
-          <meta property="og:type" content="website" />
-          <meta property="og:url" content={"https://www." + storeInfo.domain} />
-          <meta
-            property="og:title"
-            content="Amandita Pratas | Joias em prata 925"
-          />
-          <meta
-            property="og:description"
-            content="Clique e conheça a mais nova loja de joias em prata 925 de Natal/RN!"
-          />
-          <meta
-            property="og:image"
-            content="https://amandita-uploads.s3.sa-east-1.amazonaws.com/profile-images/22/aa399f2b-a880-4f19-bf40-6e5d05efa696.jpg"
-          />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <meta
             name="google-site-verification"
@@ -110,11 +119,11 @@ export default function App({ Component, pageProps }: AppProps) {
             <CartProvider>
               <FavoritesProvider>
                 <div>
-                  <Menu></Menu>
+                  {!isNotFoundPage ? <Menu /> : null}
                   <main>
                     <Component {...pageProps} />
-                    <ContactFloating></ContactFloating>
-                    <Footer></Footer>
+                    {!isNotFoundPage ? <ContactFloating /> : null}
+                    {!isNotFoundPage ? <Footer /> : null}
                   </main>
                 </div>
               </FavoritesProvider>

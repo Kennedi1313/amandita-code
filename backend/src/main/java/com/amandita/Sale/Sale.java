@@ -57,6 +57,18 @@ public class Sale {
     private String shippingMethod;
     private Integer shippingFee;
     private String shippingZip;
+    @Column(name = "shipping_address_street")
+    private String shippingAddressStreet;
+    @Column(name = "shipping_address_number")
+    private Long shippingAddressNumber;
+    @Column(name = "shipping_address_district")
+    private String shippingAddressDistrict;
+    @Column(name = "shipping_address_city")
+    private String shippingAddressCity;
+    @Column(name = "shipping_address_state")
+    private String shippingAddressState;
+    @Column(name = "shipping_address_reference")
+    private String shippingAddressReference;
     @Column(columnDefinition = "text")
     private String shippingQuote;
     @Column(name = "melhor_envio_shipment_id")
@@ -67,6 +79,10 @@ public class Sale {
     private String melhorEnvioLabelUrl;
     @Column(name = "melhor_envio_status")
     private String melhorEnvioStatus;
+    @Column(name = "melhor_envio_invoice_key")
+    private String melhorEnvioInvoiceKey;
+    @Column(name = "external_tracking_code")
+    private String externalTrackingCode;
 
     @ManyToOne
     @JoinColumn(name = "store_id")
@@ -139,6 +155,11 @@ public class Sale {
         this.status = status;
     }
 
+    public String getMelhorEnvioInvoiceKey() { return melhorEnvioInvoiceKey; }
+    public void setMelhorEnvioInvoiceKey(String value) { this.melhorEnvioInvoiceKey = value; }
+    public String getExternalTrackingCode() { return externalTrackingCode; }
+    public void setExternalTrackingCode(String value) { this.externalTrackingCode = value; }
+
     public String getPreferenceId() {
         return preferenceId;
     }
@@ -177,6 +198,29 @@ public class Sale {
     public void setShippingFee(Integer shippingFee) { this.shippingFee = shippingFee; }
     public String getShippingZip() { return shippingZip; }
     public void setShippingZip(String shippingZip) { this.shippingZip = shippingZip; }
+    public String getShippingAddressStreet() { return shippingAddressStreet; }
+    public void setShippingAddressStreet(String value) { this.shippingAddressStreet = value; }
+    public Long getShippingAddressNumber() { return shippingAddressNumber; }
+    public void setShippingAddressNumber(Long value) { this.shippingAddressNumber = value; }
+    public String getShippingAddressDistrict() { return shippingAddressDistrict; }
+    public void setShippingAddressDistrict(String value) { this.shippingAddressDistrict = value; }
+    public String getShippingAddressCity() { return shippingAddressCity; }
+    public void setShippingAddressCity(String value) { this.shippingAddressCity = value; }
+    public String getShippingAddressState() { return shippingAddressState; }
+    public void setShippingAddressState(String value) { this.shippingAddressState = value; }
+    public String getShippingAddressReference() { return shippingAddressReference; }
+    public void setShippingAddressReference(String value) { this.shippingAddressReference = value; }
+
+    public void snapshotShippingAddress(com.amandita.customer.Address address) {
+        if (address == null) return;
+        setShippingZip(address.getZip());
+        setShippingAddressStreet(address.getStreet());
+        setShippingAddressNumber(address.getNumber());
+        setShippingAddressDistrict(address.getDistrict());
+        setShippingAddressCity(address.getCity());
+        setShippingAddressState(address.getState());
+        setShippingAddressReference(address.getReference());
+    }
     public String getShippingQuote() { return shippingQuote; }
     public void setShippingQuote(String shippingQuote) { this.shippingQuote = shippingQuote; }
     public String getMelhorEnvioShipmentId() { return melhorEnvioShipmentId; }

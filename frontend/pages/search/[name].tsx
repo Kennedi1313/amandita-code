@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Item from "../../components/item";
 import Pagination from "@/components/pagination";
 import { usePagination } from "@/components/Context/paginationContext";
@@ -19,11 +19,7 @@ export default function Search() {
     setCurrentPage(0);
   }, [query, setCurrentPage]);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [currentPage, query]);
-
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       if (query) {
         const data = await getProductsByName(query, currentPage);
@@ -31,7 +27,11 @@ export default function Search() {
         setProductListSize(data.totalElements);
       }
     } catch (error) {}
-  };
+  }, [currentPage, query]);
+
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const renderProductList = () => (
     <div>

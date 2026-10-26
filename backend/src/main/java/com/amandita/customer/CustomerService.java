@@ -70,6 +70,7 @@ public class CustomerService {
 
     public CustomerDTO getCustomerByEmailByStore(String email, Long storeId) {
         return customerDao.selectUserByEmailByStore(email, storeId)
+                .or(() -> customerDao.selectCustomerByEmailByStore(email, storeId))
                 .map(customerDTOMapper)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "customer with email [%s] not found".formatted(email)
@@ -106,6 +107,7 @@ public class CustomerService {
                 customerRegistrationRequest.city(),
                 customerRegistrationRequest.reference()
         );
+        address.setState(customerRegistrationRequest.state());
 
         Customer customer = new Customer(
                 customerRegistrationRequest.name(),
@@ -196,6 +198,11 @@ public class CustomerService {
             customer.addAddress(newAddress);
             return newAddress;
         });
+
+        if (updateRequest.state() != null && !updateRequest.state().equalsIgnoreCase(address.getState())) {
+            address.setState(updateRequest.state().trim().toUpperCase());
+            changes = true;
+        }
 
         if (updateRequest.zip() != null && !updateRequest.zip().equals(address.getZip())) {
             address.setZip(updateRequest.zip());

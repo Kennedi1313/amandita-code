@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/router";
 import { createMercadoPagoCheckout, getCustomerByEmail, getLocalDeliveryQuote, getMelhorEnvioQuote } from "@/lib/client";
 import { toast } from "react-hot-toast";
@@ -26,11 +26,16 @@ const Checkout = () => {
   const [deliveryQuote, setDeliveryQuote] = useState<any>(null);
   const [melhorEnvioQuotes, setMelhorEnvioQuotes] = useState<any[]>([]);
   const [melhorEnvioQuoteLoading, setMelhorEnvioQuoteLoading] = useState(false);
+  const [melhorEnvioQuoteError, setMelhorEnvioQuoteError] = useState("");
   const [quoteLoading, setQuoteLoading] = useState(false);
   const [shippingMethod, setShippingMethod] = useState("");
   const [shippingLabel, setShippingLabel] = useState("");
   const [shippingManuallySelected, setShippingManuallySelected] =
     useState(false);
+  const [customerDataStatus, setCustomerDataStatus] = useState<
+    "idle" | "loading" | "loaded" | "error"
+  >("idle");
+  const [customerDataEmail, setCustomerDataEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [totalPrice, setTotalPrice] = useState(0);
   const [discountPrice, setDiscountPrice] = useState(0);
@@ -42,27 +47,32 @@ const Checkout = () => {
     phone: "",
     cpf: "",
     addresses: [
-      { zip: "", street: "", number: 0, district: "", city: "", reference: "" },
+      { zip: "", street: "", number: 0, district: "", city: "", state: "", reference: "" },
     ],
   });
-  const fetchCustomers = () => {
+  const fetchCustomers = useCallback(() => {
     if (!customer?.username) {
       return;
     }
-    setLoading(true);
+    const email = customer.username;
+    setCustomerDataEmail(email);
+    setCustomerDataStatus("loading");
     getCustomerByEmail(customer.username)
       .then((res) => {
         setFullCustomer(res.data);
+        setCustomerDataEmail(email);
+        setCustomerDataStatus("loaded");
       })
       .catch((err) => {
-        toast(err.code, err.response.data.message);
-      })
-      .finally(() => {
-        setLoading(false);
+        setCustomerDataStatus("error");
+        toast.error(
+          err.response?.data?.message ||
+            "Não foi possível carregar seus dados. Tente novamente.",
+        );
       });
-  };
+  }, [customer?.username]);
 
-  const fetchProducts = () => {
+  const fetchProducts = useCallback(() => {
     const { total, fullPrice } = Object.entries(cartDetails).reduce(
       (acc, [_, product]) => {
         const itemFullPrice =
@@ -80,18 +90,18 @@ const Checkout = () => {
 
     setTotalPrice(fullPrice);
     setDiscountPrice(total);
-  };
+  }, [cartDetails]);
 
   useEffect(() => {
     setHasMounted(true);
     if (customer?.username) {
       fetchCustomers();
     }
-  }, [customer?.username]);
+  }, [customer?.username, fetchCustomers]);
 
   useEffect(() => {
     fetchProducts();
-  }, [cartDetails]);
+  }, [fetchProducts]);
 
   const pickupEnabled = storeInfo?.pickupEnabled !== false;
   const localDeliveryEnabled = storeInfo?.localDeliveryEnabled !== false;
@@ -110,21 +120,31 @@ const Checkout = () => {
       ? Math.min((discountPrice / freeShippingMinAmount) * 100, 100)
       : 0;
   const pickupAddress = storeInfo?.pickupAddress;
+  const melhorEnvioOriginAddress = storeInfo?.melhorEnvioOriginAddress;
+  const melhorEnvioOriginZip = (storeInfo?.melhorEnvioOriginZip || melhorEnvioOriginAddress?.zip || "").replace(/\D/g, "");
   const pickupAddressConfigured = Boolean(
     pickupAddress?.zip?.trim() && pickupAddress?.street?.trim() &&
     pickupAddress?.number?.trim() && pickupAddress?.district?.trim() &&
-    pickupAddress?.city?.trim(),
+    pickupAddress?.city?.trim() && pickupAddress?.state?.trim(),
   );
   const pickupAddressLabel = pickupAddressConfigured
-    ? `${pickupAddress?.street}, ${pickupAddress?.number} · ${pickupAddress?.district}, ${pickupAddress?.city} · CEP ${pickupAddress?.zip}`
+    ? `${pickupAddress?.street}, ${pickupAddress?.number} · ${pickupAddress?.district}, ${pickupAddress?.city} - ${pickupAddress?.state} · CEP ${pickupAddress?.zip}`
     : "A loja ainda não informou o endereço de retirada.";
   const mercadoPagoConfigured = storeInfo?.mercadoPagoConfigured === true;
   const mercadoPagoCheckoutReady = mercadoPagoConfigured && Boolean(storeInfo?.mercadoPagoPublicKey);
   const paymentConfigured = mercadoPagoCheckoutReady;
   const isWhatsAppOnly = !paymentConfigured;
   const requiresCustomerLogin = paymentConfigured && !customer;
-  const melhorEnvioOptions = storeInfo?.melhorEnvioConfigured && paymentConfigured
-    ? melhorEnvioQuotes.map((quote) => ({
+  const customerProfileLoading = Boolean(customer?.username) &&
+    (customerDataEmail !== customer.username ||
+      customerDataStatus === "idle" ||
+      customerDataStatus === "loading");
+  const customerProfileError = Boolean(customer?.username) &&
+    customerDataEmail === customer.username &&
+    customerDataStatus === "error";
+  const melhorEnvioOptions = useMemo(
+    () => storeInfo?.melhorEnvioConfigured && paymentConfigured
+      ? melhorEnvioQuotes.map((quote) => ({
         method: `melhor_envio:${quote.id}`,
         label: quote.name || quote.company?.name || "Melhor Envio",
         description: quote.delivery_range
@@ -132,39 +152,54 @@ const Checkout = () => {
           : "Entrega calculada pelo Melhor Envio.",
         fee: Math.round(Number(String(quote.custom_price || quote.price || 0).replace(",", ".")) * 100),
       }))
-    : [];
+      : [],
+    [storeInfo?.melhorEnvioConfigured, paymentConfigured, melhorEnvioQuotes],
+  );
 
-  const shippingOptions = [
-    pickupEnabled && pickupAddressConfigured
-      ? {
-          method: "pickup",
-          label: "Retirada na loja",
-          description: "Retire seu pedido diretamente com a loja.",
-          fee: 0,
-          available: pickupAddressConfigured,
-        }
-      : null,
-    paymentConfigured && localDeliveryEnabled && deliveryQuote?.available !== false
-      ? {
-          method: "local_delivery",
-          label: "Entrega local",
-          description: localDeliveryEtaLabel
-            ? `Prazo: ${localDeliveryEtaLabel}.`
-            : "Entrega combinada pela loja.",
-          fee: deliveryQuote?.available ? deliveryQuote.fee : 0,
-        }
-      : null,
-    ...melhorEnvioOptions,
-  ].filter(Boolean) as {
-    method: string;
-    label: string;
-    description: string;
-    fee: number;
-    available?: boolean;
-  }[];
-  const selectedShippingOption =
-    shippingOptions.find((option) => option.method === shippingMethod) ||
-    shippingOptions[0];
+  const shippingOptions = useMemo(
+    () => [
+      pickupEnabled && pickupAddressConfigured
+        ? {
+            method: "pickup",
+            label: "Retirada na loja",
+            description: "Retire seu pedido diretamente com a loja.",
+            fee: 0,
+            available: pickupAddressConfigured,
+          }
+        : null,
+      paymentConfigured && localDeliveryEnabled && deliveryQuote?.available !== false
+        ? {
+            method: "local_delivery",
+            label: "Entrega local",
+            description: localDeliveryEtaLabel
+              ? `Prazo: ${localDeliveryEtaLabel}.`
+              : "Entrega combinada pela loja.",
+            fee: deliveryQuote?.available ? deliveryQuote.fee : 0,
+          }
+        : null,
+      ...melhorEnvioOptions,
+    ].filter(Boolean) as {
+      method: string;
+      label: string;
+      description: string;
+      fee: number;
+      available?: boolean;
+    }[],
+    [
+      pickupEnabled,
+      pickupAddressConfigured,
+      paymentConfigured,
+      localDeliveryEnabled,
+      deliveryQuote?.available,
+      deliveryQuote?.fee,
+      localDeliveryEtaLabel,
+      melhorEnvioOptions,
+    ],
+  );
+  const selectedShippingOption = useMemo(
+    () => shippingOptions.find((option) => option.method === shippingMethod) || shippingOptions[0],
+    [shippingOptions, shippingMethod],
+  );
   const shouldShowFreeShippingProgress =
     localDeliveryEnabled &&
     selectedShippingOption?.method === "local_delivery" &&
@@ -196,6 +231,12 @@ const Checkout = () => {
   useEffect(() => {
     if (!storeInfo?.melhorEnvioConfigured || !paymentConfigured || !address?.zip || discountPrice <= 0) {
       setMelhorEnvioQuotes([]);
+      setMelhorEnvioQuoteError("");
+      return;
+    }
+    if (melhorEnvioOriginZip.length !== 8) {
+      setMelhorEnvioQuotes([]);
+      setMelhorEnvioQuoteError("A loja ainda não configurou um endereço de postagem válido no Melhor Envio.");
       return;
     }
     const products = Object.values(cartDetails).map((product: any) => ({
@@ -214,15 +255,20 @@ const Checkout = () => {
     let active = true;
     setMelhorEnvioQuoteLoading(true);
     getMelhorEnvioQuote({
-      from: { postal_code: storeInfo.shippingOriginZip?.replace(/\D/g, "") },
+      from: { postal_code: melhorEnvioOriginZip },
       to: { postal_code: address.zip.replace(/\D/g, "") },
       products,
       options: { insurance_value: discountPrice, receipt: false, own_hand: false, reverse: false },
     }).then((response) => {
       if (active) setMelhorEnvioQuotes(Array.isArray(response.data) ? response.data.filter((quote: any) => !quote.error) : []);
-    }).catch(() => { if (active) setMelhorEnvioQuotes([]); }).finally(() => { if (active) setMelhorEnvioQuoteLoading(false); });
+    }).catch((error) => {
+      if (active) {
+        setMelhorEnvioQuotes([]);
+        setMelhorEnvioQuoteError(error.response?.data?.message || "Não foi possível consultar o Melhor Envio para este endereço.");
+      }
+    }).finally(() => { if (active) setMelhorEnvioQuoteLoading(false); });
     return () => { active = false; };
-  }, [storeInfo?.melhorEnvioConfigured, storeInfo?.shippingOriginZip, address?.zip, discountPrice, cartDetails, paymentConfigured]);
+  }, [storeInfo?.melhorEnvioConfigured, melhorEnvioOriginZip, address?.zip, discountPrice, cartDetails, paymentConfigured]);
   useEffect(() => {
     if (shippingMethod === "local_delivery" && deliveryQuote?.available) setFrete(deliveryQuote.fee);
     else if (shippingMethod?.startsWith("melhor_envio:")) {
@@ -240,9 +286,12 @@ const Checkout = () => {
     requiresDeliveryAddress && (!address || !address.number) ? "numero" : null,
     requiresDeliveryAddress && (!address || !hasText(address.district)) ? "bairro" : null,
     requiresDeliveryAddress && (!address || !hasText(address.city)) ? "cidade" : null,
+    requiresDeliveryAddress && (!address || !hasText(address.state)) ? "UF" : null,
   ].filter(Boolean) as string[];
   const canFinalizeOrder =
-    cartCount > 0 && !requiresCustomerLogin && missingCheckoutFields.length === 0 && shippingOptions.length > 0;
+    cartCount > 0 && !requiresCustomerLogin && !customerProfileLoading &&
+    !customerProfileError && missingCheckoutFields.length === 0 &&
+    shippingOptions.length > 0;
   const hasValidDeliveryQuote = isWhatsAppOnly || selectedShippingOption?.method !== "local_delivery" || (deliveryQuote?.available && !quoteLoading);
   const hasValidSelectedShipping = selectedShippingOption?.method !== "pickup" || pickupAddressConfigured;
   const canProceedWithSelectedShipping = canFinalizeOrder && hasValidDeliveryQuote && hasValidSelectedShipping;
@@ -276,7 +325,15 @@ const Checkout = () => {
         ? JSON.stringify(selectedShippingOption)
         : null,
     },
-  }), [cartDetails, fullCustomer.email, frete, shippingMethod, address?.zip]);
+  }), [
+    cartDetails,
+    fullCustomer.email,
+    frete,
+    shippingMethod,
+    address?.zip,
+    requiresDeliveryAddress,
+    selectedShippingOption,
+  ]);
 
   useEffect(() => {
     if (!hasMounted || !storeInfo || shippingOptions.length === 0) return;
@@ -308,6 +365,7 @@ const Checkout = () => {
     localDeliveryEnabled,
     isFreeLocalDelivery,
     shippingManuallySelected,
+    shippingOptions,
   ]);
 
   if (!hasMounted) {
@@ -548,6 +606,33 @@ const Checkout = () => {
       ) : (
         <>
       {customer && (
+      customerProfileLoading ? (
+        <div
+          className="my-2 flex min-h-28 items-center justify-center gap-3 rounded-2xl border border-gray-100 bg-white p-5 text-sm text-gray-600 shadow-sm md:col-span-2"
+          role="status"
+          aria-live="polite"
+        >
+          <span
+            className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-900"
+            aria-hidden="true"
+          />
+          <span>Carregando seus dados de contato e entrega…</span>
+        </div>
+      ) : customerProfileError ? (
+        <div
+          className="my-2 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-900 md:col-span-2"
+          role="alert"
+        >
+          <p>Não foi possível carregar seus dados para esta compra.</p>
+          <button
+            type="button"
+            onClick={fetchCustomers}
+            className="self-start rounded-lg bg-gray-950 px-4 py-2 font-semibold text-white"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : (
       <div className="grid gap-3 py-1 md:grid-cols-2 md:gap-4">
         <section className="my-2 flex w-full flex-col gap-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-5">
           <h2 className="font-semibold text-gray-950">
@@ -606,6 +691,7 @@ const Checkout = () => {
           )}
         </section>
       </div>
+      )
       )}
       <section className="my-4 flex w-full flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
         {!canFinalizeOrder && (
@@ -614,13 +700,29 @@ const Checkout = () => {
               <FiAlertCircle className="mt-1 text-xl shrink-0" />
               <div>
                 <p className="font-semibold">
-                  {shippingOptions.length === 0
+                  {customerProfileLoading
+                    ? "Carregando seus dados para a compra"
+                    : customerProfileError
+                      ? "Não foi possível carregar seu cadastro"
+                      : shippingOptions.length === 0
                     ? "A loja ainda não configurou formas de envio"
                     : cartCount === 0
                       ? "Adicione produtos para seguir para o pagamento"
                       : "Complete seus dados para finalizar o pedido"}
                 </p>
-                {cartCount === 0 ? (
+                {customerProfileLoading ? (
+                  <p className="mt-1 text-sm" role="status">
+                    Estamos buscando seus dados salvos. O checkout será liberado assim que terminar.
+                  </p>
+                ) : customerProfileError ? (
+                  <button
+                    type="button"
+                    onClick={fetchCustomers}
+                    className="mt-3 inline-flex rounded-lg bg-gray-950 px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Tentar novamente
+                  </button>
+                ) : cartCount === 0 ? (
                   <p className="mt-1 text-sm">
                     Escolha ao menos um produto antes de fechar o pedido.
                   </p>
@@ -724,6 +826,11 @@ const Checkout = () => {
               {storeInfo?.melhorEnvioConfigured && paymentConfigured && melhorEnvioQuoteLoading && (
                 <p className="text-sm text-gray-500">Calculando opções do Melhor Envio…</p>
               )}
+              {storeInfo?.melhorEnvioConfigured && paymentConfigured && !melhorEnvioQuoteLoading && melhorEnvioQuoteError && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="alert">
+                  {melhorEnvioQuoteError}
+                </div>
+              )}
               {shouldShowFreeShippingProgress && (
                 <div className="mt-2 w-full rounded-xl border border-gray-100 bg-gray-50 p-4">
                   <div className="mb-2 flex flex-col gap-1 text-sm md:flex-row md:items-center md:justify-between">
@@ -814,7 +921,17 @@ const Checkout = () => {
               className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-xl bg-gray-300 px-5 py-3 font-semibold text-gray-600 md:mt-6"
               aria-live="polite"
             >
-              {selectedDeliveryBlocked
+              {customerProfileLoading ? (
+                <>
+                  <span
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-gray-500 border-t-transparent"
+                    aria-hidden="true"
+                  />
+                  Carregando seus dados…
+                </>
+              ) : customerProfileError
+                ? "Não foi possível carregar seu cadastro"
+                : selectedDeliveryBlocked
                 ? quoteLoading
                   ? "Calculando entrega…"
                   : "Entrega indisponível para este CEP"

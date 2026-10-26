@@ -4,6 +4,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -24,12 +25,15 @@ public class StoreController {
     private final LocalDeliveryService localDeliveryService;
     private final MercadoPagoOAuthService mercadoPagoOAuthService;
     private final StorePlanService storePlanService;
+    private final StoreDeletionService storeDeletionService;
     private final String mercadoPagoPublicKey;
 
+    @Autowired
     public StoreController(StoreDao storeDao, CategoryDao categoryDao, StoreImageService storeImageService,
                            AsaasSubaccountService asaasSubaccountService, LocalDeliveryService localDeliveryService,
                            MercadoPagoOAuthService mercadoPagoOAuthService,
                            StorePlanService storePlanService,
+                           StoreDeletionService storeDeletionService,
                            @Value("${mercadopago.public-key:}") String mercadoPagoPublicKey) {
         this.storeDao = storeDao;
         this.categoryDao = categoryDao;
@@ -38,7 +42,16 @@ public class StoreController {
         this.localDeliveryService = localDeliveryService;
         this.mercadoPagoOAuthService = mercadoPagoOAuthService;
         this.storePlanService = storePlanService;
+        this.storeDeletionService = storeDeletionService;
         this.mercadoPagoPublicKey = mercadoPagoPublicKey;
+    }
+
+    public StoreController(StoreDao storeDao, CategoryDao categoryDao, StoreImageService storeImageService,
+                           AsaasSubaccountService asaasSubaccountService, LocalDeliveryService localDeliveryService,
+                           MercadoPagoOAuthService mercadoPagoOAuthService, StorePlanService storePlanService,
+                           String mercadoPagoPublicKey) {
+        this(storeDao, categoryDao, storeImageService, asaasSubaccountService, localDeliveryService,
+                mercadoPagoOAuthService, storePlanService, null, mercadoPagoPublicKey);
     }
 
     @GetMapping("/mercadopago/connect")
@@ -115,6 +128,11 @@ public class StoreController {
                 .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
 
         store.setName(updateRequest.name());
+        String taxDocument = updateRequest.taxDocument() == null ? "" : updateRequest.taxDocument().replaceAll("\\D", "");
+        if (!taxDocument.isBlank() && taxDocument.length() != 14) {
+            throw new IllegalArgumentException("O CNPJ da loja deve conter 14 dígitos.");
+        }
+        store.setTaxDocument(taxDocument.isBlank() ? null : taxDocument);
         store.setLogoUrl(updateRequest.logoUrl());
         if (updateRequest.headerBackgroundColor() != null) {
             if (!updateRequest.headerBackgroundColor().matches("^#[0-9A-Fa-f]{6}$")) {
@@ -129,12 +147,12 @@ public class StoreController {
         store.setIconUrl(updateRequest.iconUrl());
         store.setInstagram(updateRequest.instagram());
         store.setWhatsapp(updateRequest.whatsapp());
-        store.setPickupEnabled(updateRequest.pickupEnabled() == null || updateRequest.pickupEnabled());
+        store.setPickupEnabled(updateRequest.pickupEnabled() != null && updateRequest.pickupEnabled());
         if (updateRequest.pickupAddress() != null) {
             store.setPickupAddress(updateRequest.pickupAddress());
         }
         if (store.getPlan() == StorePlan.COMPLETE) {
-            store.setLocalDeliveryEnabled(updateRequest.localDeliveryEnabled() == null || updateRequest.localDeliveryEnabled());
+            store.setLocalDeliveryEnabled(updateRequest.localDeliveryEnabled() != null && updateRequest.localDeliveryEnabled());
             store.setLocalDeliveryFee(Math.max(updateRequest.localDeliveryFee() == null ? 0 : updateRequest.localDeliveryFee(), 0));
             store.setFreeShippingMinAmount(Math.max(updateRequest.freeShippingMinAmount() == null ? 0 : updateRequest.freeShippingMinAmount(), 0));
             store.setShippingOriginZip(updateRequest.shippingOriginZip());
@@ -156,6 +174,15 @@ public class StoreController {
                 storeDao.insertStore(store), mercadoPagoPublicKey));
     }
 
+    @DeleteMapping
+    public ResponseEntity<Void> deleteStore(HttpServletRequest request) {
+        if (storeDeletionService == null) {
+            throw new IllegalStateException("Serviço de exclusão não configurado.");
+        }
+        storeDeletionService.deleteStore((Long) request.getAttribute("storeId"));
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/categories")
     public List<Category> getCategoriesByStore(HttpServletRequest request) {
         return categoryDao.getCategoriesByStore((Long) request.getAttribute("storeId"));
@@ -164,14 +191,14 @@ public class StoreController {
     @PostMapping("/categories")
     public Category addCategory(@RequestBody CategoryRequest categoryRequest,
                                 HttpServletRequest request) {
-        return categoryDao.addCategory((Long) request.getAttribute("storeId"), categoryRequest.name());
+        return categoryDao.addCategory((Long) request.getAttribute("storeId"), categoryRequest);
     }
 
     @PutMapping("/categories/{categoryId}")
     public Category updateCategory(@PathVariable Long categoryId,
                                    @RequestBody CategoryRequest categoryRequest,
                                    HttpServletRequest request) {
-        return categoryDao.updateCategory((Long) request.getAttribute("storeId"), categoryId, categoryRequest.name());
+        return categoryDao.updateCategory((Long) request.getAttribute("storeId"), categoryId, categoryRequest);
     }
 
     @DeleteMapping("/categories/{categoryId}")

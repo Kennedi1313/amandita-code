@@ -12,7 +12,6 @@ import {
   BsHeartFill,
   BsStar,
   BsStarFill,
-  BsWhatsapp,
 } from "react-icons/bs";
 import Share from "./shareSocial";
 import { useShoppingCart } from "@/hooks/use-shopping-cart";
@@ -43,7 +42,7 @@ export default function Item(props: ItemProps) {
     removeItem: removeItemFavorites,
   } = useShoppingFavorites();
   const [adding, setAdding] = useState(false);
-  const toastId = useRef<string>();
+  const toastId = useRef<string | undefined>(undefined);
   const isInFavorites = () => {
     if (favoritesDetails) {
       return Object.keys(favoritesDetails).includes(String(props.id));
@@ -102,6 +101,14 @@ export default function Item(props: ItemProps) {
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 50vw, 33vw"
           />
+          {totalQuantity === 0 && (
+            <span
+              aria-label="Produto indisponível"
+              className="absolute left-2 top-2 z-10 inline-flex rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm sm:text-xs"
+            >
+              Esgotado
+            </span>
+          )}
         </div>
         <div className="flex min-h-[4.5rem] flex-1 flex-col justify-between gap-2 px-1 pb-1">
           <span className="line-clamp-2 text-sm font-medium leading-5 text-gray-800 sm:text-base">
@@ -147,31 +154,6 @@ export default function Item(props: ItemProps) {
         <></>
       )}
 
-      {totalQuantity == 0 ? (
-        <span className="font-bold text-[14px] absolute left-[3%] w-[60%] top-2 rounded-lg bg-red-600 py-2 px-4 text-white md:w-fit">
-          Produto Indisponível
-        </span>
-      ) : (
-        <></>
-      )}
-
-      {totalQuantity == 0 && storeInfo.whatsapp ? (
-        <a
-          href={
-            `https://api.whatsapp.com/send?phone=${storeInfo.whatsapp.replace(/\D/g, "")}&text=${encodeURIComponent(
-              `Olá, tudo bem? Gostaria de ser avisado quando este produto chegar em estoque: https://${storeInfo.domain}/details/${props.id}`,
-            )}`
-          }
-          target="_blank"
-          rel="noreferrer"
-          className="absolute inset-x-3 bottom-3 flex min-h-10 items-center justify-center gap-2 rounded-xl bg-green-whatsapp px-3 py-2 text-white shadow-sm transition hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
-        >
-          <BsWhatsapp className="w-5 h-5"></BsWhatsapp>
-          <span className="font-bold text-[14px]">Me avise quando chegar</span>
-        </a>
-      ) : (
-        <></>
-      )}
     </div>
   );
 }

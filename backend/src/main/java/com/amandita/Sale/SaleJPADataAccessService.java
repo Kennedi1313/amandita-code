@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Repository
 public class SaleJPADataAccessService implements SaleDao {
@@ -27,6 +28,12 @@ public class SaleJPADataAccessService implements SaleDao {
     public List<Sale> findPendingMercadoPagoSales(Long storeId) {
         return saleRepository.findByStore_IdAndPaymentMethodAndStatus(
                 storeId, "MERCADO_PAGO", "PENDENTE");
+    }
+
+    @Override
+    public List<Sale> findExpiredPendingMercadoPagoSales(LocalDateTime before) {
+        return saleRepository.findByPaymentMethodAndStatusAndSaleDateBefore(
+                "MERCADO_PAGO", "PENDENTE", before);
     }
 
     @Override

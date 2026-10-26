@@ -49,6 +49,7 @@ const Signup = () => {
     number: 0,
     district: "",
     city: "",
+    state: "",
     reference: "",
   });
 
@@ -57,7 +58,7 @@ const Signup = () => {
       router.push("/account");
     }
     setIsClient(true);
-  }, []);
+  }, [customer, router]);
 
   const onSubmit = (customer: any) => {
     saveCustomer(customer)

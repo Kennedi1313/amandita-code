@@ -19,7 +19,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 @RestController
 @RequestMapping("api/v1/products")
@@ -234,7 +233,7 @@ public class ProductController {
     @PostMapping("/sales")
     public ResponseEntity<SaleResponse> updateSales(@RequestBody SaleStatusUpdateRequest details,
                                                     HttpServletRequest httpRequest) {
-        Sale sale = productService.updateSaleStatus(details.saleId(), details.status(), (Long) httpRequest.getAttribute("storeId"));
+        Sale sale = productService.updateSaleStatus(details.saleId(), details.status(), details.trackingCode(), (Long) httpRequest.getAttribute("storeId"));
         return ResponseEntity.ok(
                 SaleResponse.fromEntity(sale, new ProductDTOMapper(), new CustomerDTOMapper())
         );
@@ -256,6 +255,6 @@ public class ProductController {
         throw new AccessDeniedException("Acesso negado.");
     }
 
-    private record SaleStatusUpdateRequest(Long saleId, String status) {
+    private record SaleStatusUpdateRequest(Long saleId, String status, String trackingCode) {
     }
 }

@@ -57,7 +57,7 @@ export default function SearchBar({ iconColor = "currentColor" }: { iconColor?: 
             onSubmit={handleSearch}
             className="relative flex w-full items-center gap-2 border-t border-gray-100 bg-white px-4 py-3 shadow-md"
           >
-            <div className="flex min-w-0 flex-1 flex-row items-center rounded-full border border-gray-200 bg-gray-50 px-3">
+            <div className="flex min-w-0 flex-1 flex-row items-center rounded-full border-2 bg-gray-50 px-3" style={{ borderColor: iconColor }}>
               <FiSearch className="mr-2 shrink-0 text-xl text-gray-500" />
               <input
                 ref={mobileInputRef}
@@ -88,7 +88,7 @@ export default function SearchBar({ iconColor = "currentColor" }: { iconColor?: 
         onSubmit={handleSearch}
         className="hidden md:fixed md:left-0 md:top-4 md:z-50 md:flex md:h-12 md:w-1/3 md:items-center md:bg-transparent md:px-10 md:text-gray-500"
       >
-        <div className="flex w-full flex-row rounded-full border border-gray-200 bg-gray-50 transition focus-within:border-gray-400 focus-within:bg-white">
+        <div className="flex w-full flex-row rounded-full border-2 bg-gray-50 transition focus-within:bg-white" style={{ borderColor: iconColor }}>
           <button
             type="submit"
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-gray-600 transition hover:text-gray-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"

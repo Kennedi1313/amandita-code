@@ -15,6 +15,8 @@ import java.util.Optional;
 public interface CustomerRepository
         extends JpaRepository<Customer, Integer> {
 
+    Optional<Customer> findFirstByOwnedStoreId(Long storeId);
+
     @Query("SELECT (count(c) > 0) FROM Customer c JOIN c.store s WHERE c.email = :email AND s.id = :storeId")
     boolean existsCustomerByEmailByStore(String email, Long storeId);
     @Query("select (count(c) > 0) from Customer c where c.email = ?1")

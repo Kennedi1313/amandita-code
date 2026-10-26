@@ -30,7 +30,7 @@ export default function Home({ products, itemsCount }: HomeProps) {
   }, []);
   const storeInfo = useStoreInfo();
   if (!storeInfo) return null;
-  const hasUploadedBanner = storeInfo.bannerUrl.match(/^https?:\/\//i);
+  const hasUploadedBanner = Boolean(storeInfo.bannerUrl);
   const desktopBannerSrc = hasUploadedBanner
     ? storeInfo.bannerUrl
     : "/" + storeInfo.bannerUrl + ".png";
@@ -40,7 +40,7 @@ export default function Home({ products, itemsCount }: HomeProps) {
   return (
     <div className="min-h-screen bg-[#fbfaf9] pb-16">
       <div className="mx-auto max-w-7xl px-4 pt-20 sm:px-6 md:pt-32 lg:px-8">
-        <section
+        {hasUploadedBanner ? <section
           aria-label="Apresentação da loja"
           className="overflow-hidden rounded-2xl bg-[#f3f0ed] shadow-sm ring-1 ring-black/5 sm:rounded-b-3xl"
         >
@@ -62,7 +62,7 @@ export default function Home({ products, itemsCount }: HomeProps) {
               className="object-cover sm:hidden"
             />
           </div>
-        </section>
+        </section> : null}
 
         <section id="novidades" className="scroll-mt-28 py-12 sm:py-16">
           <div className="mb-7 flex flex-wrap items-end justify-between gap-4 sm:mb-9">

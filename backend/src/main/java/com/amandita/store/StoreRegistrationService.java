@@ -210,8 +210,8 @@ public class StoreRegistrationService {
         store.setMelhorEnvioRefreshToken("");
         store.setInstagram("");
         store.setWhatsapp(StringUtils.defaultString(whatsapp));
-        store.setPickupEnabled(true);
-        store.setLocalDeliveryEnabled(true);
+        store.setPickupEnabled(false);
+        store.setLocalDeliveryEnabled(false);
         store.setLocalDeliveryFee(0);
         store.setFreeShippingMinAmount(0);
         store.setLocalDeliveryEta("A combinar");
@@ -219,7 +219,6 @@ public class StoreRegistrationService {
         store.setUpdatedAt(now);
         Store savedStore = storeRepository.save(store);
 
-        seedDefaultCategories(savedStore);
         return savedStore;
     }
 

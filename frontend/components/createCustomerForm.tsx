@@ -21,6 +21,7 @@ const CreateCustomerForm = ({
         setFieldValue("street", res.data.logradouro);
         setFieldValue("district", res.data.bairro);
         setFieldValue("city", res.data.localidade);
+        setFieldValue("state", res.data.uf);
       })
       .catch((err) => {});
   };
@@ -95,6 +96,7 @@ const CreateCustomerForm = ({
                 <TextInput label="Número" name="number" type="number" />
                 <TextInput label="Bairro" name="district" type="text" />
                 <TextInput label="Cidade" name="city" type="text" />
+                <TextInput label="UF" name="state" type="text" maxLength={2} />
                 <TextInput
                   label="Ponto de referência"
                   name="reference"

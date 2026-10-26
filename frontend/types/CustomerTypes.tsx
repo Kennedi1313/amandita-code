@@ -12,6 +12,7 @@ export type Customer = {
       number: number;
       district: string;
       city: string;
+      state: string;
       reference: string;
     },
   ];
@@ -28,5 +29,6 @@ export type CustomerForm = {
   number: number;
   district: string;
   city: string;
+  state: string;
   reference: string;
 };

@@ -150,17 +150,26 @@ public class MercadoPagoCheckoutService {
         return BigDecimal.valueOf(cents).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
-    private String storefrontBaseUrl(Store store) {
+    String storefrontBaseUrl(Store store) {
         String configured = StringUtils.defaultIfBlank(returnBaseUrl, store.getDomain());
         if (StringUtils.isBlank(configured)) throw new IllegalStateException("Domínio da loja não configurado.");
         String base = configured.startsWith("http://") || configured.startsWith("https://")
                 ? configured : "https://" + configured;
         URI uri = URI.create(base);
-        if (uri.getHost() == null || ("https".equalsIgnoreCase(uri.getScheme()) == false
-                && !"localhost".equalsIgnoreCase(uri.getHost()) && !"127.0.0.1".equals(uri.getHost()))) {
+        if (uri.getHost() == null) {
+            throw new IllegalStateException("URL de retorno do checkout inválida.");
+        }
+        if (isLocalhost(uri.getHost())) {
+            return "https://" + uri.getHost();
+        }
+        if (!"https".equalsIgnoreCase(uri.getScheme())) {
             throw new IllegalStateException("URL de retorno do checkout inválida.");
         }
         return base.replaceAll("/+$", "");
+    }
+
+    private boolean isLocalhost(String host) {
+        return "localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host);
     }
 
     private String statementDescriptor(String storeName) {

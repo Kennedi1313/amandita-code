@@ -1,0 +1,1 @@
+ALTER TABLE store ADD COLUMN IF NOT EXISTS tax_document VARCHAR(14);
