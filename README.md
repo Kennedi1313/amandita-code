@@ -79,6 +79,8 @@ See the service README files for details:
 - `frontend/README.md`
 - `backend/README.md`
 
+For the GitHub Actions staging deployment and VPS configuration, see [`STAGING-DEPLOY.md`](STAGING-DEPLOY.md).
+
 ## Notes
 
 - The repo uses Docker Compose to keep all services in a single development environment.
