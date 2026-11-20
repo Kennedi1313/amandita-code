@@ -288,3 +288,9 @@ export const getUrl = () => {
     ? buildUrl.replace(/\/+$/, "")
     : DEFAULT_ADMIN_API_BUILD_URL;
 }
+
+export const getProductReviews = () =>
+  axios.get(`${getUrl()}/api/v1/reviews/admin`, getStoreConfig());
+
+export const updateProductReviewStatus = (id, status) =>
+  axios.patch(`${getUrl()}/api/v1/reviews/admin/${id}`, { status }, getStoreConfig());

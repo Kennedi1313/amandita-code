@@ -19,6 +19,7 @@ const Product = lazy(() => import("./Product.jsx"));
 const StoreSettings = lazy(() => import("./StoreSettings.jsx"));
 const PlanBilling = lazy(() => import("./PlanBilling.jsx"));
 const Categories = lazy(() => import("./Categories.jsx"));
+const Reviews = lazy(() => import("./Reviews.jsx"));
 const Profile = lazy(() => import("./Profile.jsx"));
 const Login = lazy(() => import("./components/login/Login.jsx"));
 const Signup = lazy(() => import("./components/signup/Signup.jsx"));
@@ -98,6 +99,14 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: "dashboard/sales",
+    element: withLoadingFallback(
+      <ProtectedRoute>
+        <Home view="sales" />
+      </ProtectedRoute>,
+    ),
+  },
+  {
     path: "dashboard/profile",
     element: withLoadingFallback(
       <ProtectedRoute>
@@ -158,6 +167,14 @@ const router = createBrowserRouter([
     element: withLoadingFallback(
       <ProtectedRoute>
         <Categories />
+      </ProtectedRoute>,
+    ),
+  },
+  {
+    path: "dashboard/reviews",
+    element: withLoadingFallback(
+      <ProtectedRoute>
+        <Reviews />
       </ProtectedRoute>,
     ),
   },

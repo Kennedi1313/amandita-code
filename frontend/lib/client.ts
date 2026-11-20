@@ -167,6 +167,15 @@ export const createMercadoPagoCheckout = async (checkoutData: any) => {
 export const getMercadoPagoSaleStatus = async (saleId: string | number) =>
   axios.get(`${getUrl()}/payment/mercadopago/sale/${saleId}`, getAuthConfig());
 
+export const getGuestMercadoPagoSaleStatus = async (
+  saleId: string | number,
+  token: string,
+) =>
+  axios.get(
+    `${getUrl()}/payment/mercadopago/guest-sale/${saleId}`,
+    { ...getStoreRequestConfig(), params: { token } },
+  );
+
 export const getSales = async () => {
   try {
     return await axios.get(`${getUrl()}/products/sales`, getStoreRequestConfig());
@@ -240,6 +249,15 @@ export const getLocalDeliveryQuote = async (zip: string, subtotal: number) => {
 export const getMelhorEnvioQuote = async (payload: Record<string, unknown>) => {
   return axios.post(`${getUrl()}/melhorenvio/quote`, payload, getStoreRequestConfig());
 };
+
+export const getProductReviews = async (productId: number) =>
+  axios.get(`${getApiBaseUrl()}/reviews/products/${productId}`, getStoreRequestConfig());
+
+export const getMyReviewedSaleItems = async () =>
+  axios.get(`${getApiBaseUrl()}/reviews/mine`, getAuthConfig());
+
+export const createProductReview = async (payload: { saleItemId: number; rating: number; title?: string; comment?: string }) =>
+  axios.post(`${getApiBaseUrl()}/reviews`, payload, getAuthConfig());
 
 export const getStoreInfoByDomain = async (domain: string) => {
   try {

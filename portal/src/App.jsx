@@ -58,43 +58,53 @@ const readApiResponse = async (response) => {
 };
 
 const highlights = [
-  "Sem custo para criar",
-  "Você escolhe como começar",
-  "WhatsApp e painel simples",
-  "Evolua no seu ritmo",
+  "Grátis para começar",
+  "Sem cartão de crédito",
+  "Suporte humano no WhatsApp",
 ];
 
 const workflow = [
   {
-    title: "Crie a loja",
-    text: "Nome, endereço e acesso em poucos campos.",
+    icon: "store",
+    title: "Crie sua loja",
+    text: "Escolha um nome e um endereço. A estrutura fica pronta em minutos.",
   },
   {
-    title: "Suba produtos",
-    text: "Fotos, preço, estoque, categorias e variações.",
+    icon: "box",
+    title: "Cadastre seus produtos",
+    text: "Adicione fotos, preços e estoque pelo painel, sem precisar programar.",
   },
   {
-    title: "Receba pedidos",
-    text: "Comece pelo WhatsApp e ative pagamento online depois.",
+    icon: "sparkles",
+    title: "Comece a vender",
+    text: "Compartilhe sua vitrine e receba pedidos pelo WhatsApp ou online.",
   },
 ];
 
 const resources = [
   {
-    title: "Prefere deixar com a gente?",
-    text: "Criamos sua loja sem cobrar pela criação e entregamos em até 1 dia útil.",
+    icon: "box",
+    eyebrow: "Sua vitrine",
+    title: "Produtos fáceis de encontrar",
+    text: "Adicione fotos, preços e estoque. Atualize seu catálogo pelo painel sempre que precisar.",
   },
   {
-    title: "Suporte sem robô",
-    text: "Quando precisar, nosso suporte humano e gratuito está no WhatsApp.",
+    icon: "message",
+    eyebrow: "Atendimento e pagamento",
+    title: "Venda pelo WhatsApp ou online",
+    text: "Receba pedidos pelo WhatsApp ou habilite pagamentos online no plano Completo.",
   },
   {
-    title: "Tudo em um painel",
-    text: "Acompanhe produtos, pagamentos, clientes e preparos em um só lugar.",
+    icon: "credit-card",
+    eyebrow: "Pedidos em ordem",
+    title: "Saiba o que precisa ser feito",
+    text: "Acompanhe o que chegou, está em preparo ou já foi enviado, sem se perder nas conversas.",
   },
   {
-    title: "Sua loja cresce com você",
-    text: "Integração com pix, cartão e envio quando fizer sentido pra você.",
+    icon: "truck",
+    eyebrow: "Entrega do seu jeito",
+    title: "Retirada ou entrega, você escolhe",
+    text: "Ofereça retirada, entrega local ou envio conforme a forma como atende seus clientes.",
   },
 ];
 
@@ -161,6 +171,7 @@ function App() {
   const [createdStore, setCreatedStore] = useState(null);
   const [status, setStatus] = useState({ type: "idle", message: "" });
   const [cookiesVisible, setCookiesVisible] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => {
     if (!hasAnalyticsConfigured()) return;
@@ -316,299 +327,343 @@ function App() {
 
   return (
     <main className="page-shell">
-      <section className="hero">
-        <nav className="nav">
-          <a className="brand" href="#top" aria-label="KIZI">
+      <header className="site-header">
+        <nav className="nav" aria-label="Navegação principal">
+          <a className="brand" href="#top" aria-label="KIZI, início">
             <img className="brand-mark" src="/logo.png" alt="" />
-            <div>
-              <strong>KIZI</strong>
-            </div>
+            <strong>KIZI</strong>
           </a>
           <div className="nav-links">
             <a href="#como-funciona">Como funciona</a>
             <a href="#recursos">Recursos</a>
             <a href="#planos">Planos</a>
-            <a href="#criar" onClick={() => trackAnalytics("signup_cta_clicked", { placement: "nav" })}>
-              Começar grátis
-            </a>
           </div>
+          <button
+            className="mobile-nav-toggle"
+            type="button"
+            aria-label={mobileMenuOpen ? "Fechar menu" : "Abrir menu"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="mobile-navigation"
+            onClick={() => setMobileMenuOpen((open) => !open)}
+          >
+            <MenuIcon open={mobileMenuOpen} />
+          </button>
+          <a
+            className="button button-small button-primary nav-cta"
+            href="#criar"
+            onClick={() => {
+              setMobileMenuOpen(false);
+              trackAnalytics("signup_cta_clicked", { placement: "nav" });
+            }}
+          >
+            Criar loja grátis <ArrowIcon />
+          </a>
         </nav>
+        <div className={`mobile-nav ${mobileMenuOpen ? "is-open" : ""}`} id="mobile-navigation">
+          <a href="#como-funciona" onClick={() => setMobileMenuOpen(false)}>Como funciona</a>
+          <a href="#recursos" onClick={() => setMobileMenuOpen(false)}>Recursos</a>
+          <a href="#planos" onClick={() => setMobileMenuOpen(false)}>Planos</a>
+        </div>
+      </header>
 
-        <div className="hero-grid" id="top">
+      <section className="hero" id="top">
+        <div className="hero-grid">
           <div className="hero-copy">
-            <p className="eyebrow">Sua loja online, do jeito mais simples</p>
+            <p className="eyebrow"><span className="eyebrow-dot" />LOJA ONLINE PARA PEQUENOS NEGÓCIOS</p>
             <h1>
-              Sua loja no ar.
-              <span> Em até 5 minutos.</span>
+              Sua loja online.
+              <span>Pronta em até 5 minutos.</span>
             </h1>
             <p className="lead">
-              Crie sua loja grátis, sem precisar entender de tecnologia. Quer pular essa etapa? A gente monta tudo para você, também de graça, em até 1 dia útil.
+              Coloque seus produtos na internet sem contratar alguém ou aprender tecnologia. Comece grátis e venda do seu jeito.
             </p>
 
             <div className="hero-actions">
               <a
-                className="primary-link"
+                className="button button-primary button-large"
                 href="#criar"
                 onClick={() => trackAnalytics("signup_cta_clicked", { placement: "hero" })}
               >
-                Quero criar minha loja
+                Criar minha loja grátis <ArrowIcon />
               </a>
-              <a
-                className="secondary-link"
-                href={getSupportUrl("Oi! Quero que a KIZI crie minha loja gratuitamente. Entendi que a entrega é em até 1 dia útil.")}
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => trackAnalytics("assisted_setup_whatsapp_clicked", { placement: "hero" })}
-              >
-                Prefiro que vocês criem grátis
+              <a className="button button-outline button-large" href="#demo">
+                Ver demonstração
               </a>
             </div>
-            <p className="hero-promise">Criação gratuita nos dois caminhos · sem compromisso para começar</p>
 
-            <ul className="highlight-list">
+            <ul className="highlight-list" aria-label="Vantagens para começar">
               {highlights.map((item) => (
-                <li key={item}><span aria-hidden="true">✓</span>{item}</li>
+                <li key={item}><CheckIcon />{item}</li>
               ))}
             </ul>
 
+            <a
+              className="hero-assisted-link"
+              href={getSupportUrl("Oi! Quero que a KIZI crie minha loja gratuitamente. Entendi que a entrega é em até 1 dia útil.")}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => trackAnalytics("assisted_setup_whatsapp_clicked", { placement: "hero" })}
+            >
+              Ou peça para a gente criar de graça em até 1 dia útil <span aria-hidden="true">↗</span>
+            </a>
           </div>
 
-          <section className="signup-card" id="criar">
-            <div className="signup-kicker"><span>Crie em poucos passos</span><span>R$ 0 para começar</span></div>
-            <div className="progress">
-              <span className={step === "account" ? "active" : "done"}>1</span>
-              <div />
-              <span className={step === "store" ? "active" : step === "done" ? "done" : ""}>2</span>
+          <ProductMockup />
+        </div>
+        <div className="hero-glow" aria-hidden="true" />
+      </section>
+
+      <section className="section signup-section" id="criar">
+        <div className="signup-copy">
+          <p className="section-kicker">Seu primeiro passo</p>
+          <h2>Comece com o que você já tem.</h2>
+          <p>
+            Crie o acesso com sua conta Google. Depois, escolha o nome da loja e pronto: o painel estará preparado para você cadastrar seus produtos.
+          </p>
+          <div className="signup-benefits">
+            <span><CheckIcon />Sem cartão para criar</span>
+            <span><CheckIcon />Você pode editar tudo depois</span>
+            <span><CheckIcon />Ajuda humana quando precisar</span>
+          </div>
+          <div className="assist-card">
+            <div className="assist-icon"><ChatIcon /></div>
+            <div>
+              <strong>Prefere não configurar?</strong>
+              <p>A gente cria sua loja de graça e entrega em até 1 dia útil.</p>
+              <a
+                href={getSupportUrl("Oi! Quero solicitar a criação gratuita da minha loja pela equipe KIZI. Entendi que a entrega é em até 1 dia útil.")}
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => trackAnalytics("assisted_setup_whatsapp_clicked", { placement: "signup_section" })}
+              >
+                Pedir criação pelo WhatsApp <ArrowIcon />
+              </a>
             </div>
+          </div>
+        </div>
 
-            {step === "account" && (
-              <div>
-                <div className="card-header">
-                  <span>Opção 1 · faça você mesma</span>
-                  <h2>Comece sua loja agora</h2>
-                  <p>Entre com Google e escolha o nome e o endereço da sua loja. A estrutura fica pronta em até 5 minutos.</p>
-                </div>
+        <section className="signup-card" aria-labelledby="signup-title">
+          <div className="signup-kicker">
+            <span>Crie sua loja</span>
+            <span className="free-pill">R$ 0 para começar</span>
+          </div>
+          <div className="progress" aria-label={step === "account" ? "Etapa 1 de 2" : "Etapa 2 de 2"}>
+            <span className={step === "account" ? "active" : "done"}>1</span>
+            <div />
+            <span className={step === "store" ? "active" : step === "done" ? "done" : ""}>2</span>
+          </div>
 
-                <GoogleButton onCredential={createAccountWithGoogle} />
-
-                <p className="google-fallback" role="status" aria-live="polite">
-                  {GOOGLE_CLIENT_ID
-                    ? "Usamos seu Google apenas para criar o acesso ao painel."
-                    : "O acesso com Google será habilitado quando estiver configurado para este ambiente."}
-                </p>
-                <div className="assisted-choice">
-                  <span>Quer pular a configuração?</span>
-                  <p>A gente cria sua loja gratuitamente e entrega em até 1 dia útil.</p>
-                  <a
-                    href={getSupportUrl("Oi! Quero solicitar a criação gratuita da minha loja pela equipe KIZI. Entendi que a entrega é em até 1 dia útil.")}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={() => trackAnalytics("assisted_setup_whatsapp_clicked", { placement: "signup_card" })}
-                  >
-                    Pedir criação grátis pelo WhatsApp <span aria-hidden="true">↗</span>
-                  </a>
-                </div>
+          {step === "account" && (
+            <div>
+              <div className="card-header">
+                <span>PASSO 1 DE 2</span>
+                <h2 id="signup-title">Entre com Google</h2>
+                <p>É rápido e seguro. Em seguida, você escolhe o nome da sua loja.</p>
               </div>
-            )}
+              <GoogleButton onCredential={createAccountWithGoogle} />
+              <p className="google-fallback" role="status" aria-live="polite">
+                {GOOGLE_CLIENT_ID
+                  ? "Usamos seu Google para criar seu acesso ao painel."
+                  : "O acesso com Google será habilitado quando estiver configurado para este ambiente."}
+              </p>
+            </div>
+          )}
 
-            {step === "store" && (
-              <form onSubmit={createStore}>
-                <div className="card-header">
-                  <span>Quase lá</span>
-                  <h2>Dê um nome à sua loja</h2>
-                  <p>Você pode ajustar os detalhes e cadastrar seus produtos depois, no painel.</p>
-                </div>
-
-                <label>
-                  Nome da loja
+          {step === "store" && (
+            <form onSubmit={createStore}>
+              <div className="card-header">
+                <span>PASSO 2 DE 2</span>
+                <h2 id="signup-title">Dê um nome à sua loja</h2>
+                <p>Você pode ajustar os detalhes e cadastrar os produtos depois.</p>
+              </div>
+              <label>
+                Nome da loja
+                <input
+                  name="storeName"
+                  value={store.storeName}
+                  onChange={updateStore}
+                  placeholder="Maria Modas"
+                  required
+                />
+              </label>
+              <label>
+                Endereço da loja
+                <div className="domain-input">
                   <input
-                    name="storeName"
-                    value={store.storeName}
+                    name="subdomain"
+                    value={store.subdomain}
                     onChange={updateStore}
-                    placeholder="Maria Modas"
+                    placeholder="maria-modas"
                     required
                   />
-                </label>
-
-                <label>
-                  Endereço da loja
-                  <div className="domain-input">
-                    <input
-                      name="subdomain"
-                      value={store.subdomain}
-                      onChange={updateStore}
-                      placeholder="maria-modas"
-                      required
-                    />
-                    <span>.{BASE_DOMAIN}</span>
-                  </div>
-                </label>
-
-                <label>
-                  WhatsApp para contato <span className="optional-label">opcional</span>
-                  <input
-                    name="whatsapp"
-                    value={store.whatsapp}
-                    onChange={updateStore}
-                    placeholder="84999999999"
-                  />
-                </label>
-
-                <div className="domain-preview">
-                  <span>Sua loja vai ficar em</span>
-                  <strong>{previewDomain}</strong>
+                  <span>.{BASE_DOMAIN}</span>
                 </div>
-
-                <button type="submit" disabled={status.type === "loading"}>
-                  {status.type === "loading" ? "Criando sua loja..." : "Criar minha loja grátis"}
-                </button>
-                <button className="text-button" type="button" onClick={() => setStep("account")}>
-                  Voltar
-                </button>
-              </form>
-            )}
-
-            {step === "done" && createdStore && (
-              <div className="done-panel">
-                <div className="success-mark">✓</div>
-                <div className="card-header">
-                  <span>Seu próximo passo</span>
-                  <h2>Sua loja está no ar.</h2>
-                  <p>{createdStore.storeName} já tem um endereço. Entre no painel para adicionar produtos e publicar sua vitrine.</p>
-                </div>
-                <div className="created-box">
-                  <span>Endereço público</span>
-                  <strong>{createdStore.domain}</strong>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    trackAnalytics("admin_handoff_clicked");
-                    goToAdmin();
-                  }}
-                >
-                  Abrir meu painel
-                </button>
-                <a className="done-help-link" href={getSupportUrl(`Oi! Criei a loja ${createdStore.storeName} e quero ajuda para configurar.`)} target="_blank" rel="noreferrer">
-                  Quero ajuda para configurar
-                </a>
+              </label>
+              <label>
+                WhatsApp para contato <span className="optional-label">opcional</span>
+                <input
+                  name="whatsapp"
+                  value={store.whatsapp}
+                  onChange={updateStore}
+                  placeholder="84999999999"
+                />
+              </label>
+              <div className="domain-preview">
+                <span>Sua loja vai ficar em</span>
+                <strong>{previewDomain}</strong>
               </div>
-            )}
+              <button className="button button-primary submit-button" type="submit" disabled={status.type === "loading"}>
+                {status.type === "loading" ? "Criando sua loja..." : "Criar minha loja grátis"}
+                {status.type !== "loading" && <ArrowIcon />}
+              </button>
+              <button className="text-button" type="button" onClick={() => setStep("account")}>
+                Voltar
+              </button>
+            </form>
+          )}
 
-            {status.message && step !== "done" && (
-              <p
-                className={`form-status ${status.type}`}
-                role={status.type === "error" ? "alert" : "status"}
-                aria-live={status.type === "error" ? "assertive" : "polite"}
+          {step === "done" && createdStore && (
+            <div className="done-panel">
+              <div className="success-mark"><CheckIcon /></div>
+              <div className="card-header">
+                <span>PRÓXIMO PASSO</span>
+                <h2 id="signup-title">Sua loja está no ar.</h2>
+                <p>{createdStore.storeName} já tem um endereço. Entre no painel para adicionar produtos e publicar sua vitrine.</p>
+              </div>
+              <div className="created-box">
+                <span>Endereço público</span>
+                <strong>{createdStore.domain}</strong>
+              </div>
+              <button className="button button-primary submit-button" type="button" onClick={() => {
+                trackAnalytics("admin_handoff_clicked");
+                goToAdmin();
+              }}>
+                Abrir meu painel <ArrowIcon />
+              </button>
+              <a
+                className="done-help-link"
+                href={getSupportUrl(`Oi! Criei a loja ${createdStore.storeName} e quero ajuda para configurar.`)}
+                target="_blank"
+                rel="noreferrer"
               >
-                {status.message}
-              </p>
-            )}
-          </section>
-        </div>
+                Quero ajuda para configurar
+              </a>
+            </div>
+          )}
+
+          {status.message && step !== "done" && (
+            <p
+              className={`form-status ${status.type}`}
+              role={status.type === "error" ? "alert" : "status"}
+              aria-live={status.type === "error" ? "assertive" : "polite"}
+            >
+              {status.message}
+            </p>
+          )}
+        </section>
       </section>
 
-      <section className="preview-section" aria-label="Prévia do painel KIZI">
-        <div className="preview-caption">
-          <span>Painel simples de verdade</span>
-          <p>Produtos, pedidos e informações da sua loja em um só lugar.</p>
+      <section className="section features-section" id="recursos">
+        <div className="section-heading">
+          <p className="section-kicker">Recursos para vender com autonomia</p>
+          <h2>Da vitrine ao pedido, sem complicação.</h2>
+          <p>Mostre seus produtos, receba pedidos e organize cada venda no seu ritmo.</p>
         </div>
-        <div className="app-preview">
-          <img src="/platform-preview.png" alt="Painel KIZI para administrar produtos e pedidos da loja" />
-        </div>
-      </section>
-
-      <section className="section workflow-section" id="como-funciona">
-        <div className="section-header">
-          <span>Você decide o ritmo</span>
-          <h2>Do nome da loja à vitrine, sem complicação.</h2>
-          <p>Em poucos minutos você cria a estrutura. Depois, completa a vitrine quando quiser.</p>
-        </div>
-
-        <div className="workflow-grid">
-          {workflow.map((item, index) => (
-            <article className="workflow-card" key={item.title}>
-              <span>{index + 1}</span>
+        <div className="bento-grid">
+          {resources.map((item, index) => (
+            <article className={`bento-card bento-card-${index + 1}`} key={item.title}>
+              <div className="bento-card-top">
+                <span className="feature-icon"><FeatureIcon name={item.icon} /></span>
+                <span className="feature-index">0{index + 1}</span>
+              </div>
+              <p className="feature-eyebrow">{item.eyebrow}</p>
               <h3>{item.title}</h3>
-              <p>{item.text}</p>
+              <p className="feature-description">{item.text}</p>
+              {index === 0 && (
+                <div className="channel-preview" aria-hidden="true">
+                  <span>Cadastro</span><span>Variações</span><span>Dimensões</span>
+                </div>
+              )}
+              {index === 1 && (
+                <div className="channel-preview" aria-hidden="true">
+                  <span>WhatsApp</span><span>Pix</span><span>Cartão</span>
+                </div>
+              )}
+              {index === 2 && (
+                <div className="channel-preview" aria-hidden="true">
+                  <span>Status</span><span>Etiqueta</span><span>Rastreio</span>
+                </div>
+              )}
+              {index === 3 && (
+                <div className="shipping-preview" aria-hidden="true">
+                  <span>Retirada</span><span>Entrega local</span><span>Envio</span>
+                </div>
+              )}
             </article>
           ))}
         </div>
       </section>
 
-      <section className="section features-section" id="recursos">
-        <div className="feature-band">
-          <div className="feature-copy">
-            <span>Gente de verdade do seu lado</span>
-            <h2>Você não precisa fazer tudo sozinho.</h2>
-            <p>
-              A gente te ajuda a criar sua loja, sem custo adicional. E quando precisar, nosso suporte humano está no
-              WhatsApp.
-            </p>
-            <a
-              className="primary-link"
-              href={getSupportUrl("Oi! Quero ajuda gratuita para criar minha loja na KIZI.")}
-              target="_blank"
-              rel="noreferrer"
-            >
-              Falar com uma pessoa no WhatsApp
-              <span aria-hidden="true"> ↗</span>
-            </a>
-          </div>
-          <div className="resource-grid">
-            {resources.map((item, index) => (
-              <article className="resource-card" key={item.title}>
-                <span className="resource-number">0{index + 1}</span>
-                <h3>{item.title}</h3>
-                <p>{item.text}</p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
       <section className="section plans-section" id="planos">
-        <div className="section-header">
-          <span>Planos simples</span>
-          <h2>Comece grátis. Evolua no seu tempo.</h2>
-          <p>
-            Valide pelo WhatsApp ou venda com pagamento e envio integrados.
-          </p>
+        <div className="section-heading">
+          <p className="section-kicker">Sem surpresa no preço</p>
+          <h2>Comece grátis. Cresça quando fizer sentido.</h2>
+          <p>Crie sua loja sem pagar. Ative mais recursos quando sua operação precisar.</p>
         </div>
-
         <div className="plans-grid">
           {plans.map((plan) => (
             <article className={`plan-card ${plan.featured ? "featured" : ""}`} key={plan.name}>
+              {plan.featured && <span className="plan-badge">Para vender online</span>}
               <h3>{plan.name}</h3>
               <div className="plan-price">
                 <strong>{plan.price}</strong>
                 <span>{plan.period}</span>
               </div>
-              <p>{plan.description}</p>
+              <p className="plan-description">{plan.description}</p>
               <ul>
                 {plan.features.map((feature) => (
-                  <li key={feature}>{feature}</li>
+                  <li key={feature}><CheckIcon />{feature}</li>
                 ))}
               </ul>
               <a
-                className={plan.featured ? "primary-link" : "secondary-link"}
+                className="button button-primary"
                 href="#criar"
                 onClick={() => trackAnalytics("signup_cta_clicked", {
                   placement: "pricing",
                   plan: plan.name.toLowerCase(),
                 })}
               >
-                {plan.action}
+                {plan.action} <ArrowIcon />
               </a>
             </article>
           ))}
         </div>
       </section>
 
-      <section className="section faq-section">
-        <div className="section-header">
-          <span>Duvidas comuns</span>
-          <h2>Sem enrolação.</h2>
+      <section className="assisted-section">
+        <div className="assisted-banner">
+          <div className="assisted-banner-icon"><ChatIcon /></div>
+          <div>
+            <p className="section-kicker">Criação assistida, sem custo</p>
+            <h2>Se preferir, a gente monta sua loja para você.</h2>
+            <p>Conte o que você vende. Nossa equipe prepara a loja e entrega em até 1 dia útil.</p>
+          </div>
+          <a
+            className="button button-light"
+            href={getSupportUrl("Oi! Quero que a KIZI crie minha loja gratuitamente. Entendi que a entrega é em até 1 dia útil.")}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => trackAnalytics("assisted_setup_whatsapp_clicked", { placement: "assisted_banner" })}
+          >
+            Pedir ajuda <ArrowIcon />
+          </a>
+        </div>
+      </section>
+
+      <section className="section faq-section" id="duvidas">
+        <div className="section-heading">
+          <p className="section-kicker">Dúvidas comuns</p>
+          <h2>Respostas simples, sem letras miúdas.</h2>
         </div>
         <div className="faq-grid">
           {questions.map((item) => (
@@ -621,32 +676,45 @@ function App() {
       </section>
 
       <footer className="footer">
-        <div>
-          <strong>KIZI</strong>
-          <p>Uma forma mais simples de levar seu negócio para o digital.</p>
-        </div>
-        <div className="footer-links">
-          <a href="/privacidade.html">Privacidade</a>
-          {hasAnalyticsConfigured() && (
-            <button className="cookie-preferences" type="button" onClick={() => setCookiesVisible(true)}>
-              Preferências de cookies
-            </button>
-          )}
-          <a
-            className="primary-link"
-            href="#criar"
-            onClick={() => trackAnalytics("signup_cta_clicked", { placement: "footer" })}
-          >
-            Criar minha loja
-          </a>
+        <div className="footer-inner">
+          <div className="footer-main">
+            <div className="footer-brand">
+              <a className="brand" href="#top" aria-label="KIZI, voltar ao início">
+                <img className="brand-mark" src="/logo.png" alt="" />
+                <strong>KIZI</strong>
+              </a>
+              <p>Um jeito mais simples de levar seu negócio para o digital.</p>
+            </div>
+            <nav className="footer-links" aria-label="Navegação do rodapé">
+              <a href="#como-funciona">Como funciona</a>
+              <a href="#recursos">Recursos</a>
+              <a href="#planos">Planos</a>
+              <a href="/privacidade.html">Privacidade</a>
+              {hasAnalyticsConfigured() && (
+                <button className="cookie-preferences" type="button" onClick={() => setCookiesVisible(true)}>
+                  Preferências de cookies
+                </button>
+              )}
+              <a
+                className="button button-primary button-small"
+                href="#criar"
+                onClick={() => trackAnalytics("signup_cta_clicked", { placement: "footer" })}
+              >
+                Criar loja grátis <ArrowIcon />
+              </a>
+            </nav>
+          </div>
+          <div className="footer-bottom">
+            <span>© {new Date().getFullYear()} KIZI</span>
+            <span>Feito para simplificar as vendas de pequenos negócios.</span>
+          </div>
         </div>
       </footer>
+
       {cookiesVisible && (
         <div className="cookie-banner" role="dialog" aria-label="Preferências de cookies">
           <p>
-            Usamos cookies essenciais e, se você permitir, métricas do Google Analytics e
-            PostHog para entender o uso do portal e melhorar a experiência. Você pode mudar
-            sua escolha a qualquer momento em Preferências de cookies. <a href="/privacidade.html">Saiba mais</a>.
+            Usamos cookies essenciais e, se você permitir, métricas do Google Analytics e PostHog para entender o uso do portal. Você pode mudar sua escolha em <a href="/privacidade.html">Privacidade</a>.
           </p>
           <div className="cookie-actions">
             <button className="cookie-reject" type="button" onClick={() => updateAnalyticsConsent("rejected")}>
@@ -659,13 +727,129 @@ function App() {
         </div>
       )}
       <a
-        className="mobile-fixed-cta"
+        className={`mobile-fixed-cta ${cookiesVisible ? "is-hidden" : ""}`}
         href="#criar"
         onClick={() => trackAnalytics("signup_cta_clicked", { placement: "mobile_fixed" })}
       >
-        Criar minha loja
+        Criar minha loja grátis <ArrowIcon />
       </a>
     </main>
+  );
+}
+
+function ProductMockup() {
+  const barHeights = [30, 46, 37, 64, 48, 76, 56, 88, 65, 79, 58, 96];
+
+  return (
+    <div className="product-visual" id="demo" aria-label="Prévia ilustrativa do painel KIZI">
+      <div className="mockup-glow" aria-hidden="true" />
+      <div className="mockup-window">
+        <div className="browser-bar">
+          <div className="browser-dots" aria-hidden="true"><i /><i /><i /></div>
+          <span className="browser-address">painel.kizi.com.br</span>
+          <span className="preview-status"><i /> Prévia</span>
+        </div>
+        <div className="mockup-app">
+          <aside className="mockup-sidebar" aria-hidden="true">
+            <div className="mockup-brand"><img src="/logo.png" alt="" /><strong>KIZI</strong></div>
+            <span className="sidebar-label">MENU</span>
+            <span className="sidebar-link is-active"><span className="sidebar-glyph">⌂</span>Visão geral</span>
+            <span className="sidebar-link"><span className="sidebar-glyph">▧</span>Produtos</span>
+            <span className="sidebar-link"><span className="sidebar-glyph">▤</span>Pedidos</span>
+            <span className="sidebar-link"><span className="sidebar-glyph">◉</span>Minha loja</span>
+            <div className="sidebar-bottom"><span className="avatar">A</span><span>Ana Oliveira<small>Minha loja</small></span></div>
+          </aside>
+          <div className="mockup-content">
+            <div className="mockup-topline">
+              <div>
+                <span className="mockup-kicker">VISÃO GERAL</span>
+                <h2>Bom dia, Ana <span aria-hidden="true">✦</span></h2>
+                <p>Acompanhe o que está acontecendo na sua loja.</p>
+              </div>
+              <span className="store-online"><i /> Loja publicada</span>
+            </div>
+
+            <div className="mockup-stats">
+              <article><span>Vendas do mês</span><strong>R$ 2.480</strong><small>Resumo de exemplo</small></article>
+              <article><span>Pedidos</span><strong>18</strong><small>Em todos os canais</small></article>
+              <article><span>Produtos ativos</span><strong>24</strong><small>No seu catálogo</small></article>
+            </div>
+
+            <div className="mockup-lower">
+              <section className="sales-card">
+                <div className="sales-card-heading"><div><span>DESEMPENHO</span><h3>Suas vendas</h3></div><span className="period-select">Este mês⌄</span></div>
+                <strong className="sales-total">R$ 2.480,00</strong>
+                <div className="sales-chart" aria-hidden="true">
+                  {barHeights.map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}
+                </div>
+                <div className="chart-labels"><span>01 jun</span><span>15 jun</span><span>30 jun</span></div>
+              </section>
+              <section className="orders-card">
+                <div className="sales-card-heading"><div><span>ACOMPANHAMENTO</span><h3>Pedidos</h3></div><span className="orders-count">3</span></div>
+                <div className="order-row"><i className="order-dot dot-green" /><span>#1048<small>Pago</small></span><b>R$ 129</b></div>
+                <div className="order-row"><i className="order-dot dot-blue" /><span>#1047<small>Em preparo</small></span><b>R$ 84</b></div>
+                <div className="order-row"><i className="order-dot dot-gray" /><span>#1046<small>Aguardando</small></span><b>R$ 56</b></div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="mockup-caption"><span className="caption-check"><CheckIcon /></span><span><strong>Simples de administrar</strong><small>Produtos e pedidos em um só painel</small></span></div>
+    </div>
+  );
+}
+
+function FeatureIcon({ name }) {
+  const paths = {
+    store: <><path d="M3 10h18" /><path d="M5 10v10h14V10" /><path d="m4 10 1.2-6h13.6L20 10" /><path d="M9 20v-6h6v6" /></>,
+    box: <><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="M3 8v9l9 5 9-5V8" /><path d="M12 13v9" /></>,
+    message: <><path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-5.5A7.5 7.5 0 1 1 20 11.5Z" /><path d="M8 11h.01M12 11h.01M16 11h.01" /></>,
+    "credit-card": <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 10h18M7 15h4" /></>,
+    truck: <><path d="M3 6h11v12H3z" /><path d="M14 10h4l3 3v5h-7" /><circle cx="7.5" cy="18" r="1.5" /><circle cx="17.5" cy="18" r="1.5" /></>,
+    sparkles: <><path d="m12 3 1.5 5.5L19 10l-5.5 1.5L12 17l-1.5-5.5L5 10l5.5-1.5L12 3Z" /><path d="m19 16 .7 2.3L22 19l-2.3.7L19 22l-.7-2.3L16 19l2.3-.7L19 16Z" /></>,
+  };
+
+  return (
+    <svg className="feature-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {paths[name] || paths.sparkles}
+    </svg>
+  );
+}
+
+function ArrowIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M4.5 10h10m-4-4 4 4-4 4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="m4.5 10.5 3.5 3.5 7.5-8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 11.5a7.5 7.5 0 0 1-7.5 7.5H5l-2 2v-5.5A7.5 7.5 0 1 1 20 11.5Z" />
+      <path d="M8 11h.01M12 11h.01M16 11h.01" />
+    </svg>
+  );
+}
+
+function MenuIcon({ open }) {
+  return open ? (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="m6 6 12 12M18 6 6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -707,6 +891,7 @@ const GoogleButton = ({ onCredential }) => {
       size: "large",
       shape: "rectangular",
       text: "continue_with",
+      logo_alignment: "left",
       width: buttonRef.current.offsetWidth || 360,
       locale: "pt-BR",
     });

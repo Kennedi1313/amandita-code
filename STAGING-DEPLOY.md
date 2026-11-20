@@ -9,10 +9,10 @@ O deploy envia o código do commit ao servidor por SSH e executa `docker compose
 - Instale Docker Engine com o plugin Docker Compose v2, `curl` e `tar`.
 - Crie um usuário de deploy com chave SSH dedicada e acesso ao Docker.
 - Crie um diretório estável para o checkout, por exemplo `/opt/kizi-staging`.
-- Configure nesse diretório um `.env` fora do Git. Use `POSTGRES_PASSWORD` forte, com pelo menos 24 caracteres, e `MERCADOPAGO_SANDBOX=true`.
+- Configure nesse diretório um `.env` fora do Git. Use `POSTGRES_PASSWORD` forte, com pelo menos 24 caracteres, `PLATFORM_ADMIN_ACCESS_TOKEN` aleatório com pelo menos 32 caracteres, e `MERCADOPAGO_SANDBOX=true`.
 - Configure as URLs públicas HTTPS de staging para API, painel, portal e vitrine; configure também `SAAS_BASE_DOMAIN`, `GOOGLE_CLIENT_ID` e as origens CORS.
 - Configure as credenciais de sandbox do Mercado Pago. Mantenha tokens e segredos apenas no `.env` da VPS.
-- Instale um proxy HTTPS no host (Caddy/Nginx) e roteie os domínios para os serviços locais: API `127.0.0.1:8080`, admin `127.0.0.1:4173`, vitrine `127.0.0.1:3000`, portal `127.0.0.1:5174`. Configure DNS e certificado TLS, incluindo wildcard para os subdomínios das lojas.
+- Instale um proxy HTTPS no host (Caddy/Nginx) e roteie os domínios para os serviços locais: API `127.0.0.1:8080`, admin `127.0.0.1:4173`, platform-admin `127.0.0.1:4174`, vitrine `127.0.0.1:3000`, portal `127.0.0.1:5174`. Restrinja o host do platform-admin por VPN, allowlist de IP ou autenticação no proxy. Configure DNS e certificado TLS, incluindo wildcard para os subdomínios das lojas.
 
 O workflow não configura DNS, TLS ou o proxy reverso, pois esses passos dependem do domínio e do provedor escolhidos.
 
@@ -35,4 +35,6 @@ Adicione a chave pública correspondente a `VPS_SSH_PRIVATE_KEY` em `~/.ssh/auth
 
 Depois de configurar variáveis e secrets, um push para `mega-pr-mvp-safety-pass` ou `main` roda validações; com o deploy habilitado, também publica em staging. O job exige que os testes e builds passem antes de conectar à VPS. O `workflow_dispatch` permite execução manual depois que o workflow estiver disponível na branch padrão.
 
-O script faz verificações HTTP locais dos quatro serviços depois da subida. A URL pública, certificado, login Google, pagamentos de sandbox e webhooks devem ser conferidos no navegador após o deploy.
+O script faz verificações HTTP locais dos cinco serviços depois da subida. A URL pública, certificado, login Google, pagamentos de sandbox e webhooks devem ser conferidos no navegador após o deploy.
+
+O PostgreSQL local permanece na versão 14 para preservar o volume existente. Essa versão saiu de suporte em 12 de novembro de 2026. Não use essa configuração de banco em produção: antes do lançamento, migre o banco da VPS para uma versão suportada e valide backup e restauração. Veja [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md).

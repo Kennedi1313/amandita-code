@@ -27,6 +27,29 @@ public interface ProductRepository extends JpaRepository<Product, Integer> {
     Optional<Product> findByIdAndStoreId(Integer id, Long storeId);
     Page<Product> findByStoreIdAndCategoryAndActiveTrue(Long storeId, String category, Pageable pageable);
     Page<Product> findByStoreIdAndCategoryAndActiveTrueAndPublishedTrue(Long storeId, String category, Pageable pageable);
+    Page<Product> findByStoreIdAndCategoryInAndActiveTrue(Long storeId, List<String> categories, Pageable pageable);
+    Page<Product> findByStoreIdAndCategoryInAndActiveTrueAndPublishedTrue(Long storeId, List<String> categories, Pageable pageable);
+    @Query("""
+            select distinct p from Product p
+            where p.store.id = :storeId and p.category in :categories and p.active = true
+              and (:publishedOnly = false or p.published = true)
+              and (:promoOnly = false or coalesce(p.promo, 0) > 0 or exists
+                   (select v.id from ProductVariation v where v.product = p and coalesce(v.promo, 0) > 0))
+              and (:inStockOnly = false or coalesce(p.quantity, 0) > 0 or exists
+                   (select v.id from ProductVariation v where v.product = p and coalesce(v.quantity, 0) > 0))
+              and (:minPrice is null or p.price >= :minPrice or exists
+                   (select v.id from ProductVariation v where v.product = p and v.price >= :minPrice))
+              and (:maxPrice is null or p.price <= :maxPrice or exists
+                   (select v.id from ProductVariation v where v.product = p and v.price <= :maxPrice))
+            """)
+    Page<Product> filterCategoryProducts(@Param("storeId") Long storeId,
+                                         @Param("categories") List<String> categories,
+                                         @Param("publishedOnly") boolean publishedOnly,
+                                         @Param("promoOnly") boolean promoOnly,
+                                         @Param("inStockOnly") boolean inStockOnly,
+                                         @Param("minPrice") Integer minPrice,
+                                         @Param("maxPrice") Integer maxPrice,
+                                         Pageable pageable);
     boolean existsByStoreIdAndCategory(Long storeId, String category);
     Page<Product> findByCategoryAndActiveTrue(String category, Pageable pageable);
     Page<Product> findByCategoryAndNameContainingAndActiveTrue(String category, String name, Pageable pageable);

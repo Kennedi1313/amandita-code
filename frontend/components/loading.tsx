@@ -1,8 +1,12 @@
-export default function Loading() {
+import Spinner from "@/components/spinner";
+
+export default function Loading({ label = "Carregando..." }: { label?: string }) {
   return (
-    <div className="mt-36 md:min-w-screen-lg min-h-screen mx-auto flex flex-col items-center justify-start px-1 md:px-0 py-5 my-2">
-      <span className="text-lg font-semibold mb-4">Carregando produtos...</span>
-      <div className="w-12 h-12 mb-80 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+    <div
+      className="mx-auto flex min-h-[50vh] max-w-7xl flex-col items-center justify-center gap-3 px-4 py-10 text-sm text-gray-600"
+    >
+      <Spinner label={label} className="h-7 w-7 border-4 text-gray-800" />
+      <span>{label}</span>
     </div>
   );
 }

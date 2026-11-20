@@ -7,6 +7,7 @@ import com.amandita.customer.Customer;
 import com.amandita.customer.CustomerRepository;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
+import okhttp3.FormBody;
 import okhttp3.Request;
 import okhttp3.Response;
 import org.apache.commons.lang3.StringUtils;
@@ -25,18 +26,28 @@ public class MelhorEnvioShipmentService {
     private final CustomerRepository customerRepository;
     private final String environment;
     private final String userAgent;
+    private final String clientId;
+    private final String clientSecret;
+    private final Object[] labelLocks = new Object[64];
 
     public MelhorEnvioShipmentService(
             SaleDao saleDao,
             StoreDao storeDao,
             CustomerRepository customerRepository,
             @Value("${melhor-envio.environment:sandbox}") String environment,
-            @Value("${melhor-envio.user-agent:Amandita (contato@amandita.com.br)}") String userAgent) {
+            @Value("${melhor-envio.user-agent:Amandita (contato@amandita.com.br)}") String userAgent,
+            @Value("${melhor-envio.client-id:}") String clientId,
+            @Value("${melhor-envio.client-secret:}") String clientSecret) {
         this.saleDao = saleDao;
         this.storeDao = storeDao;
         this.customerRepository = customerRepository;
         this.environment = environment;
         this.userAgent = userAgent;
+        this.clientId = clientId;
+        this.clientSecret = clientSecret;
+        for (int i = 0; i < labelLocks.length; i++) {
+            labelLocks[i] = new Object();
+        }
     }
 
     public Sale createLabel(Long saleId, Long storeId) {
@@ -44,6 +55,14 @@ public class MelhorEnvioShipmentService {
     }
 
     public Sale createLabel(Long saleId, Long storeId, String invoiceKey) {
+        Object lock = labelLocks[Math.floorMod(
+                Long.hashCode(saleId), labelLocks.length)];
+        synchronized (lock) {
+            return createLabelLocked(saleId, storeId, invoiceKey);
+        }
+    }
+
+    private Sale createLabelLocked(Long saleId, Long storeId, String invoiceKey) {
         Sale sale = saleDao.findByIdAndStoreId(saleId, storeId)
                 .orElseThrow(() ->
                         new IllegalArgumentException("Pedido não encontrado."));
@@ -53,10 +72,13 @@ public class MelhorEnvioShipmentService {
                     "A etiqueta só pode ser gerada para pedidos em preparação.");
         }
 
-        if (StringUtils.isNotBlank(sale.getMelhorEnvioShipmentId())) {
+        if (StringUtils.isNotBlank(sale.getMelhorEnvioShipmentId())
+                || "GENERATED".equals(sale.getMelhorEnvioOperationStatus())) {
             throw new IllegalStateException(
                     "Este pedido já possui uma remessa do Melhor Envio.");
         }
+
+        resetRecoveryStateForEnvironmentChange(sale);
 
         String shippingMethod = sale.getShippingMethod();
         String prefix = "melhor_envio:";
@@ -170,6 +192,18 @@ public class MelhorEnvioShipmentService {
         if (StringUtils.isNotBlank(invoiceKey) && normalizedInvoiceKey.length() != 44) {
             throw new IllegalStateException("A chave da NF-e deve conter 44 dígitos.");
         }
+        String savedInvoiceKey = StringUtils.defaultString(
+                sale.getMelhorEnvioInvoiceKey());
+        if (StringUtils.isNotBlank(sale.getMelhorEnvioOperationStatus())
+                && !savedInvoiceKey.equals(normalizedInvoiceKey)) {
+            throw new IllegalStateException(
+                    "A tentativa anterior desta etiqueta já começou com outros dados de NF-e. "
+                            + "Mantenha a mesma chave para continuar a operação com segurança.");
+        }
+        sale.setMelhorEnvioInvoiceKey(StringUtils.isBlank(normalizedInvoiceKey)
+                ? null : normalizedInvoiceKey);
+        saleDao.insertSale(sale);
+
         JSONObject options = new JSONObject()
             .put("non_commercial", StringUtils.isBlank(normalizedInvoiceKey))
             .put("reverse", false)
@@ -177,6 +211,10 @@ public class MelhorEnvioShipmentService {
             .put("receipt", false)
             .put("own_hand", false)
             .put("collect", false)
+            .put("platform", "Kizi")
+            .put("tags", new JSONArray().put(new JSONObject()
+                    .put("tag", "KIZI-SALE-" + sale.getId())
+                    .put("url", JSONObject.NULL)))
             .put("reminder", "");
         if (StringUtils.isNotBlank(normalizedInvoiceKey)) {
             options.remove("non_commercial");
@@ -192,41 +230,312 @@ public class MelhorEnvioShipmentService {
                 .put("frequent_destination_id", "")
                 .put("products", productsPayload(sale));
 
-        // Avoid logging CPF/CNPJ and complete addresses in production.
-        JSONObject cartResponse = post(store, "/api/v2/me/cart", payload);
+        ensureCurrentEnvironment(sale);
+        ensureCartCreated(sale, store, payload);
+        ensureOrderPurchased(sale, store);
+        generateLabel(sale, store);
 
-        String shipmentId = firstId(cartResponse, "id", "order_id");
-        if (StringUtils.isBlank(shipmentId)) {
-            throw new IllegalStateException(
-                    "O Melhor Envio não retornou o ID da remessa.");
-        }
-
-        JSONObject checkout = post(
-                store,
-                "/api/v2/me/shipment/checkout",
-                new JSONObject().put(
-                        "orders", new JSONArray().put(shipmentId))
-        );
-
-        String orderId = firstId(checkout, "id", "order_id", "orders");
-        if (StringUtils.isBlank(orderId)) {
-            throw new IllegalStateException(
-                    "O checkout não retornou o ID do pedido.");
-        }
-
-        post(
-                store,
-                "/api/v2/me/shipment/generate",
-                new JSONObject().put(
-                        "orders", new JSONArray().put(orderId))
-        );
-
-        sale.setMelhorEnvioShipmentId(orderId);
-        sale.setMelhorEnvioStatus("GENERATED");
-        sale.setMelhorEnvioInvoiceKey(StringUtils.isBlank(normalizedInvoiceKey) ? null : normalizedInvoiceKey);
         sale.setMelhorEnvioTrackingCode(quote.optString("tracking", null));
 
         return saleDao.insertSale(sale);
+    }
+
+    private void resetRecoveryStateForEnvironmentChange(Sale sale) {
+        String currentEnvironment = normalizedEnvironment();
+        String previousEnvironment = sale.getMelhorEnvioOperationEnvironment();
+        if (StringUtils.isBlank(previousEnvironment)
+                || previousEnvironment.equals(currentEnvironment)) {
+            return;
+        }
+
+        sale.setMelhorEnvioCartId(null);
+        sale.setMelhorEnvioOrderId(null);
+        sale.setMelhorEnvioOperationStatus(null);
+        sale.setMelhorEnvioOperationEnvironment(null);
+        saleDao.insertSale(sale);
+    }
+
+    private void ensureCurrentEnvironment(Sale sale) {
+        if (!normalizedEnvironment().equals(sale.getMelhorEnvioOperationEnvironment())) {
+            sale.setMelhorEnvioOperationEnvironment(normalizedEnvironment());
+            saleDao.insertSale(sale);
+        }
+    }
+
+    private void ensureCartCreated(Sale sale, Store store, JSONObject payload) {
+        if (StringUtils.isNotBlank(sale.getMelhorEnvioCartId())) {
+            return;
+        }
+
+        String operationStatus = sale.getMelhorEnvioOperationStatus();
+        if ("CART_PENDING".equals(operationStatus)
+                || "CART_UNCONFIRMED".equals(operationStatus)) {
+            JSONObject cartPage = getOptional(store, "/api/v2/me/cart");
+            java.util.Set<String> recoveredIds = findTaggedCartIds(
+                    cartPage, "KIZI-SALE-" + sale.getId());
+            if (recoveredIds.size() == 1) {
+                sale.setMelhorEnvioCartId(recoveredIds.iterator().next());
+                sale.setMelhorEnvioOperationStatus("CART_CREATED");
+                saleDao.insertSale(sale);
+                return;
+            }
+            if (recoveredIds.size() > 1) {
+                throw new IllegalStateException(
+                        "Há mais de uma etiqueta com a identificação KIZI-SALE-"
+                                + sale.getId()
+                                + ". Confira o carrinho no Melhor Envio antes de continuar.");
+            }
+
+            JSONObject orders = getOptional(store, "/api/v2/me/orders");
+            java.util.Set<String> recoveredOrderIds = findTaggedCartIds(
+                    orders, "KIZI-SALE-" + sale.getId());
+            if (recoveredOrderIds.size() == 1) {
+                String recoveredOrderId = recoveredOrderIds.iterator().next();
+                sale.setMelhorEnvioCartId(recoveredOrderId);
+                sale.setMelhorEnvioOrderId(recoveredOrderId);
+                sale.setMelhorEnvioOperationStatus("ORDER_PURCHASED");
+                saleDao.insertSale(sale);
+                return;
+            }
+            if (recoveredOrderIds.size() > 1) {
+                throw new IllegalStateException(
+                        "Há mais de uma etiqueta comprada com a identificação KIZI-SALE-"
+                                + sale.getId()
+                                + ". Confira o painel do Melhor Envio antes de continuar.");
+            }
+
+            // Both provider listings confirmed that the tagged label is absent.
+            // It is now safe to retry the cart insertion.
+            sale.setMelhorEnvioCartId(null);
+            sale.setMelhorEnvioOrderId(null);
+            sale.setMelhorEnvioOperationStatus(null);
+            saleDao.insertSale(sale);
+            operationStatus = null;
+        }
+        if (StringUtils.isNotBlank(operationStatus)) {
+            throw new IllegalStateException(
+                    "O estado do carrinho do Melhor Envio não permite uma nova tentativa segura.");
+        }
+
+        sale.setMelhorEnvioOperationStatus("CART_PENDING");
+        saleDao.insertSale(sale);
+
+        try {
+            JSONObject cartResponse = post(store, "/api/v2/me/cart", payload);
+            String cartId = firstId(cartResponse, "id", "order_id");
+            if (StringUtils.isBlank(cartId)) {
+                sale.setMelhorEnvioOperationStatus("CART_UNCONFIRMED");
+                saleDao.insertSale(sale);
+                throw new IllegalStateException(
+                        "O Melhor Envio não retornou o ID da remessa. A tentativa foi bloqueada para evitar duplicidade.");
+            }
+
+            sale.setMelhorEnvioCartId(cartId);
+            sale.setMelhorEnvioOperationStatus("CART_CREATED");
+            saleDao.insertSale(sale);
+        } catch (IllegalStateException exception) {
+            if ("CART_PENDING".equals(sale.getMelhorEnvioOperationStatus())) {
+                sale.setMelhorEnvioOperationStatus(
+                        isClientRejection(exception) ? null : "CART_UNCONFIRMED");
+                saleDao.insertSale(sale);
+            }
+            throw exception;
+        }
+    }
+
+    private void ensureOrderPurchased(Sale sale, Store store) {
+        if (StringUtils.isNotBlank(sale.getMelhorEnvioOrderId())) {
+            return;
+        }
+
+        if ("CHECKOUT_PENDING".equals(sale.getMelhorEnvioOperationStatus())) {
+            JSONObject existingOrder = getOptional(
+                    store, "/api/v2/me/orders/" + sale.getMelhorEnvioCartId());
+            if (existingOrder != null) {
+                String recoveredOrderId = firstId(existingOrder, "id", "order_id");
+                sale.setMelhorEnvioOrderId(StringUtils.defaultIfBlank(
+                        recoveredOrderId, sale.getMelhorEnvioCartId()));
+                sale.setMelhorEnvioOperationStatus("ORDER_PURCHASED");
+                saleDao.insertSale(sale);
+                return;
+            }
+
+            JSONObject unpaidCartItem = getOptional(
+                    store, "/api/v2/me/cart/" + sale.getMelhorEnvioCartId());
+            if (unpaidCartItem == null) {
+                throw new IllegalStateException(
+                        "A compra da etiqueta no Melhor Envio ficou sem confirmação. "
+                                + "O sistema não vai cobrar de novo automaticamente. Confira o envio no painel do Melhor Envio.");
+            }
+            sale.setMelhorEnvioOperationStatus("CART_CREATED");
+            saleDao.insertSale(sale);
+        }
+
+        if (!"CART_CREATED".equals(sale.getMelhorEnvioOperationStatus())
+                || StringUtils.isBlank(sale.getMelhorEnvioCartId())) {
+            throw new IllegalStateException(
+                    "O carrinho do Melhor Envio não está confirmado para este pedido.");
+        }
+
+        sale.setMelhorEnvioOperationStatus("CHECKOUT_PENDING");
+        saleDao.insertSale(sale);
+
+        try {
+            JSONObject checkout = post(
+                    store,
+                    "/api/v2/me/shipment/checkout",
+                    new JSONObject().put(
+                            "orders", new JSONArray().put(sale.getMelhorEnvioCartId())));
+            String orderId = firstId(checkout, "id", "order_id", "orders");
+            if (StringUtils.isBlank(orderId)) {
+                throw new IllegalStateException(
+                        "O checkout não retornou o ID do pedido.");
+            }
+
+            sale.setMelhorEnvioOrderId(orderId);
+            sale.setMelhorEnvioOperationStatus("ORDER_PURCHASED");
+            saleDao.insertSale(sale);
+        } catch (IllegalStateException exception) {
+            if ("CHECKOUT_PENDING".equals(sale.getMelhorEnvioOperationStatus())
+                    && isClientRejection(exception)) {
+                sale.setMelhorEnvioOperationStatus("CART_CREATED");
+                saleDao.insertSale(sale);
+            }
+            throw exception;
+        }
+    }
+
+    private void generateLabel(Sale sale, Store store) {
+        String operationStatus = sale.getMelhorEnvioOperationStatus();
+        if (!"ORDER_PURCHASED".equals(operationStatus)
+                && !"GENERATION_PENDING".equals(operationStatus)) {
+            throw new IllegalStateException(
+                    "A compra da etiqueta no Melhor Envio ainda não está confirmada.");
+        }
+
+        String orderId = StringUtils.defaultIfBlank(
+                sale.getMelhorEnvioOrderId(), sale.getMelhorEnvioCartId());
+        if (StringUtils.isBlank(orderId)) {
+            throw new IllegalStateException(
+                    "O Melhor Envio não retornou o ID do pedido comprado.");
+        }
+
+        sale.setMelhorEnvioOperationStatus("GENERATION_PENDING");
+        saleDao.insertSale(sale);
+
+        post(store, "/api/v2/me/shipment/generate", new JSONObject()
+                .put("orders", new JSONArray().put(orderId)));
+
+        sale.setMelhorEnvioShipmentId(orderId);
+        sale.setMelhorEnvioStatus("GENERATED");
+        sale.setMelhorEnvioOperationStatus("GENERATED");
+        saleDao.insertSale(sale);
+    }
+
+    private JSONObject getOptional(Store store, String path) {
+        return getOptional(store, path, true);
+    }
+
+    private JSONObject getOptional(Store store, String path, boolean allowTokenRefresh) {
+        Request request = buildGetRequest(path, store.getMelhorEnvioAccessToken());
+        try (Response response = new OkHttpClient().newCall(request).execute()) {
+            if (response.code() == 404) {
+                return null;
+            }
+
+            String body = response.body() == null ? "" : response.body().string();
+            if (allowTokenRefresh
+                    && (response.code() == 401 || response.code() == 403)
+                    && refreshAccessToken(store)) {
+                return getOptional(store, path, false);
+            }
+            if (!response.isSuccessful()) {
+                throw new IllegalStateException("Erro Melhor Envio | HTTP: "
+                        + response.code() + " | Resposta: " + body);
+            }
+            if (body.isBlank()) {
+                return new JSONObject();
+            }
+            return body.startsWith("[")
+                    ? new JSONObject().put("data", new JSONArray(body))
+                    : new JSONObject(body);
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                    "Falha ao consultar o Melhor Envio para recuperar a etiqueta.", exception);
+        }
+    }
+
+    private java.util.Set<String> findTaggedCartIds(
+            Object node, String expectedTag) {
+        java.util.Set<String> ids = new java.util.LinkedHashSet<>();
+        collectTaggedCartIds(node, expectedTag, ids);
+        return ids;
+    }
+
+    private void collectTaggedCartIds(
+            Object node, String expectedTag, java.util.Set<String> ids) {
+        if (node instanceof JSONObject object) {
+            if (object.has("id") && containsTag(object, expectedTag)) {
+                String id = String.valueOf(object.opt("id"));
+                if (StringUtils.isNotBlank(id) && !"null".equals(id)) {
+                    ids.add(id);
+                }
+            }
+            for (String key : object.keySet()) {
+                collectTaggedCartIds(object.opt(key), expectedTag, ids);
+            }
+        } else if (node instanceof JSONArray array) {
+            for (int index = 0; index < array.length(); index++) {
+                collectTaggedCartIds(array.opt(index), expectedTag, ids);
+            }
+        }
+    }
+
+    private boolean containsTag(Object node, String expectedTag) {
+        if (node instanceof JSONObject object) {
+            if (expectedTag.equals(object.optString("tag"))) {
+                return true;
+            }
+            for (String key : object.keySet()) {
+                if (containsTag(object.opt(key), expectedTag)) {
+                    return true;
+                }
+            }
+        } else if (node instanceof JSONArray array) {
+            for (int index = 0; index < array.length(); index++) {
+                if (containsTag(array.opt(index), expectedTag)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private Request buildGetRequest(String path, String accessToken) {
+        return new Request.Builder()
+                .url(apiBaseUrl() + path)
+                .get()
+                .addHeader("Authorization", "Bearer " + accessToken)
+                .addHeader("Accept", "application/json")
+                .addHeader("User-Agent", userAgent)
+                .build();
+    }
+
+    private boolean isClientRejection(IllegalStateException exception) {
+        String message = exception.getMessage();
+        if (message == null) {
+            return false;
+        }
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("HTTP: (4\\d\\d)")
+                .matcher(message);
+        return matcher.find() && !"401".equals(matcher.group(1))
+                && !"403".equals(matcher.group(1));
+    }
+
+    private String normalizedEnvironment() {
+        return "production".equalsIgnoreCase(environment)
+                ? "production" : "sandbox";
     }
 
     public Sale printLabel(Long saleId, Long storeId) {
@@ -417,28 +726,29 @@ public class MelhorEnvioShipmentService {
     }
 
     private JSONObject post(Store store, String path, JSONObject payload) {
-        Request request = new Request.Builder()
-            .url(apiBaseUrl() + path)
-            .post(okhttp3.RequestBody.create(
-                    payload.toString(),
-                    MediaType.parse("application/json")))
-            .addHeader(
-                    "Authorization",
-                    "Bearer " + store.getMelhorEnvioAccessToken())
-            .addHeader("Accept", "application/json")
-            .addHeader("Content-Type", "application/json")
-            .addHeader("User-Agent", userAgent)
-            .addHeader("me-buy-origin", "calculator-dash")
-            .addHeader("me-buy-type", "simple")
-            .build();
-
-        try (Response response = new OkHttpClient().newCall(request).execute()) {
+        try (Response response = executePost(store, path, payload)) {
 
             String body = response.body() == null
                     ? ""
                     : response.body().string();
 
             if (!response.isSuccessful()) {
+                if (response.code() == 422
+                        && hasInvalidOriginPostalCodeError(body)) {
+                    String originZip = payload.optJSONObject("from") == null
+                            ? ""
+                            : payload.optJSONObject("from")
+                                    .optString("postal_code", "");
+                    String formattedOriginZip = originZip.matches("\\d{8}")
+                            ? originZip.substring(0, 5) + "-" + originZip.substring(5)
+                            : originZip;
+                    throw new IllegalStateException(
+                            "O Melhor Envio recusou o CEP de postagem"
+                                    + (StringUtils.isBlank(formattedOriginZip)
+                                            ? ""
+                                            : " " + formattedOriginZip)
+                                    + ". Atualize o endereço de origem na sua conta Melhor Envio e depois reconecte a integração em Configurações > Melhor Envio.");
+                }
                 throw new IllegalStateException(
                         "Erro Melhor Envio"
                         + " | HTTP: " + response.code()
@@ -455,6 +765,94 @@ public class MelhorEnvioShipmentService {
             throw new IllegalStateException(
                     "Falha de comunicação com o Melhor Envio.",
                     exception);
+        }
+    }
+
+    private Response executePost(Store store, String path, JSONObject payload)
+            throws IOException {
+        Response response = new OkHttpClient().newCall(buildPostRequest(
+                path, payload, store.getMelhorEnvioAccessToken())).execute();
+
+        if ((response.code() == 401 || response.code() == 403)
+                && refreshAccessToken(store)) {
+            response.close();
+            response = new OkHttpClient().newCall(buildPostRequest(
+                    path, payload, store.getMelhorEnvioAccessToken())).execute();
+        }
+
+        return response;
+    }
+
+    private Request buildPostRequest(String path, JSONObject payload, String accessToken) {
+        return new Request.Builder()
+                .url(apiBaseUrl() + path)
+                .post(okhttp3.RequestBody.create(
+                        payload.toString(),
+                        MediaType.parse("application/json")))
+                .addHeader("Authorization", "Bearer " + accessToken)
+                .addHeader("Accept", "application/json")
+                .addHeader("Content-Type", "application/json")
+                .addHeader("User-Agent", userAgent)
+                .addHeader("me-buy-origin", "calculator-dash")
+                .addHeader("me-buy-type", "simple")
+                .build();
+    }
+
+    private boolean refreshAccessToken(Store store) throws IOException {
+        if (StringUtils.isAnyBlank(
+                clientId, clientSecret, store.getMelhorEnvioRefreshToken())) {
+            return false;
+        }
+
+        Request refreshRequest = new Request.Builder()
+                .url(apiBaseUrl() + "/oauth/token")
+                .post(new FormBody.Builder()
+                        .add("grant_type", "refresh_token")
+                        .add("client_id", clientId)
+                        .add("client_secret", clientSecret)
+                        .add("refresh_token", store.getMelhorEnvioRefreshToken())
+                        .build())
+                .addHeader("Accept", "application/json")
+                .addHeader("Content-Type", "application/x-www-form-urlencoded")
+                .addHeader("User-Agent", userAgent)
+                .build();
+
+        try (Response response = new OkHttpClient().newCall(refreshRequest).execute()) {
+            if (!response.isSuccessful() || response.body() == null) {
+                return false;
+            }
+
+            JSONObject tokenResponse = new JSONObject(response.body().string());
+            String accessToken = tokenResponse.optString("access_token", "");
+            if (StringUtils.isBlank(accessToken)) {
+                return false;
+            }
+
+            store.setMelhorEnvioAccessToken(accessToken);
+            String refreshToken = tokenResponse.optString("refresh_token", "");
+            if (StringUtils.isNotBlank(refreshToken)) {
+                store.setMelhorEnvioRefreshToken(refreshToken);
+            }
+            storeDao.insertStore(store);
+            return true;
+        }
+    }
+
+    private boolean hasInvalidOriginPostalCodeError(String responseBody) {
+        try {
+            JSONObject errors = new JSONObject(responseBody).optJSONObject("errors");
+            if (errors == null) {
+                return false;
+            }
+
+            if (errors.has("from.postal_code")) {
+                return true;
+            }
+
+            JSONObject fromErrors = errors.optJSONObject("from");
+            return fromErrors != null && fromErrors.has("postal_code");
+        } catch (RuntimeException exception) {
+            return false;
         }
     }
 

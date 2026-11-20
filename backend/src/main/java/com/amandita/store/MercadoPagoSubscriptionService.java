@@ -216,10 +216,22 @@ public class MercadoPagoSubscriptionService {
 
         JsonNode latestFinalPayment = null;
         OffsetDateTime latestCreatedAt = null;
+        OffsetDateTime latestSuccessfulPaymentAt = null;
         for (JsonNode candidate : results) {
             String paymentId = candidate.path("id").asText(null);
+            String status = candidate.path("status").asText();
+            if ("approved".equals(status) || "processed".equals(status)) {
+                OffsetDateTime paidAt = parseDate(candidate.path("date_approved").asText(null));
+                if (paidAt == null) {
+                    paidAt = parseDate(candidate.path("date_created").asText(null));
+                }
+                if (paidAt != null && (latestSuccessfulPaymentAt == null
+                        || paidAt.isAfter(latestSuccessfulPaymentAt))) {
+                    latestSuccessfulPaymentAt = paidAt;
+                }
+            }
             if (!isValidMercadoPagoId(paymentId)
-                    || !isFinalPaymentStatus(candidate.path("status").asText())) {
+                    || !isFinalPaymentStatus(status)) {
                 continue;
             }
             OffsetDateTime createdAt = parseDate(candidate.path("date_created").asText(null));
@@ -235,9 +247,14 @@ public class MercadoPagoSubscriptionService {
         }
         String paymentId = latestFinalPayment.path("id").asText();
         Store store = storeDao.findByMpSubscriptionId(subscriptionId).orElse(null);
-        if (store == null || paymentId.equals(store.getMpSubscriptionLastPaymentId())) {
+        if (store == null) {
             return false;
         }
+        if (store.getMpSubscriptionLastPaidAt() == null && latestSuccessfulPaymentAt != null) {
+            store.setMpSubscriptionLastPaidAt(latestSuccessfulPaymentAt);
+            storeDao.insertStore(store);
+        }
+        if (paymentId.equals(store.getMpSubscriptionLastPaymentId())) return false;
         processAuthorizedPayment(paymentId);
         return true;
     }
@@ -265,6 +282,14 @@ public class MercadoPagoSubscriptionService {
         store.setMpSubscriptionLastPaymentStatus(paymentStatus);
         if ("approved".equals(paymentStatus) || "processed".equals(paymentStatus)) {
             store.setMpSubscriptionEverPaid(true);
+            OffsetDateTime paidAt = parseDate(payment.path("date_approved").asText(null));
+            if (paidAt == null) {
+                paidAt = parseDate(payment.path("date_created").asText(null));
+            }
+            if (paidAt != null && (store.getMpSubscriptionLastPaidAt() == null
+                    || paidAt.isAfter(store.getMpSubscriptionLastPaidAt()))) {
+                store.setMpSubscriptionLastPaidAt(paidAt);
+            }
         }
         storeDao.insertStore(store);
         if ("approved".equals(paymentStatus) || "processed".equals(paymentStatus)) {
@@ -313,9 +338,7 @@ public class MercadoPagoSubscriptionService {
         store.setMpSubscriptionId(subscriptionId);
         store.setMpSubscriptionStatus(status);
         OffsetDateTime nextPaymentAt = parseDate(preapproval.path("next_payment_date").asText(null));
-        if (nextPaymentAt != null) {
-            store.setMpSubscriptionNextPaymentAt(nextPaymentAt);
-        }
+        store.setMpSubscriptionNextPaymentAt(nextPaymentAt);
         boolean lastPaymentFailed = "rejected".equals(store.getMpSubscriptionLastPaymentStatus())
                 || "cancelled".equals(store.getMpSubscriptionLastPaymentStatus())
                 || "canceled".equals(store.getMpSubscriptionLastPaymentStatus());

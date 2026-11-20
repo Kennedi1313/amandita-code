@@ -16,6 +16,11 @@ services:
     networks:
       - amandita-network
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   amandita-api:
     container_name: amandita-api
@@ -41,10 +46,11 @@ services:
     networks:
       - amandita-network
     depends_on:
-      - amandita-db
+      amandita-db:
+        condition: service_healthy
     restart: unless-stopped
     volumes:
-      - ~/.amigoscode/s3:/root/.amigoscode/s3
+      - ~/.amigoscode/s3:/home/kizi/.amigoscode/s3
 
   amandita-webhook-proxy:
     image: nginx:1.27-alpine
@@ -69,6 +75,8 @@ services:
     depends_on:
       - amandita-webhook-proxy
     restart: unless-stopped
+    profiles:
+      - webhook-tunnel
 
   amandita-admin:
     container_name: amandita-admin
@@ -83,6 +91,23 @@ services:
         portal_url: ${PORTAL_PUBLIC_URL:-http://localhost:5174}
     ports:
       - "127.0.0.1:4173:4173"
+    networks:
+      - amandita-network
+    depends_on:
+      - amandita-api
+    restart: unless-stopped
+
+  amandita-platform-admin:
+    container_name: amandita-platform-admin
+    image: amandita-platform-admin:latest
+    build:
+      context: platform-admin
+      dockerfile: Dockerfile
+      args:
+        api_build_url: http://amandita-api:8080/api/v1
+        api_runtime_url: ${APP_PUBLIC_API_V1_URL:-http://localhost:8080/api/v1}
+    ports:
+      - "127.0.0.1:4174:4174"
     networks:
       - amandita-network
     depends_on:

@@ -1,6 +1,7 @@
 package com.amandita.store;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 
@@ -17,6 +18,11 @@ public class Category {
     private Integer widthCm;
     private Integer heightCm;
     private Integer lengthCm;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "parent_id")
+    @JsonIgnore
+    private Category parent;
 
     @ManyToOne
     @JoinColumn(name = "store_id", nullable = false)
@@ -57,6 +63,10 @@ public class Category {
     public void setHeightCm(Integer heightCm) { this.heightCm = heightCm; }
     public Integer getLengthCm() { return lengthCm; }
     public void setLengthCm(Integer lengthCm) { this.lengthCm = lengthCm; }
+
+    public Category getParent() { return parent; }
+    public void setParent(Category parent) { this.parent = parent; }
+    public Long getParentId() { return parent == null ? null : parent.getId(); }
 
     public Store getStore() {
         return store;

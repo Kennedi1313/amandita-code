@@ -2,6 +2,10 @@ package com.amandita.store;
 
 import okhttp3.*;
 import com.amandita.jwt.JWTUtil;
+import com.amandita.product.Product;
+import com.amandita.product.ProductDao;
+import com.amandita.product.ProductVariation;
+import com.amandita.Sale.SaleItemRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.lang3.StringUtils;
@@ -23,6 +27,10 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.Comparator;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/v1/melhorenvio")
@@ -37,6 +45,7 @@ public class MelhorEnvioOauthController {
     private final String environment;
     private final String userAgent;
     private final MelhorEnvioShipmentService shipmentService;
+    private final ProductDao productDao;
 
     public MelhorEnvioOauthController(StoreDao storeDao,
                                       JWTUtil jwtUtil,
@@ -46,7 +55,8 @@ public class MelhorEnvioOauthController {
                                       @Value("${melhor-envio.redirect-uri:}") String redirectUri,
                                       @Value("${melhor-envio.environment:sandbox}") String environment,
                                       @Value("${melhor-envio.user-agent:Amandita (contato@amandita.com.br)}") String userAgent,
-                                      MelhorEnvioShipmentService shipmentService) {
+                                      MelhorEnvioShipmentService shipmentService,
+                                      ProductDao productDao) {
         this.storeDao = storeDao;
         this.jwtUtil = jwtUtil;
         this.adminUrl = adminUrl.replaceAll("/+$", "");
@@ -56,6 +66,7 @@ public class MelhorEnvioOauthController {
         this.environment = environment;
         this.userAgent = userAgent;
         this.shipmentService = shipmentService;
+        this.productDao = productDao;
     }
 
     @PostConstruct
@@ -353,8 +364,9 @@ public class MelhorEnvioOauthController {
     }
 
     @PostMapping("/quote")
-    public ResponseEntity<String> quote(HttpServletRequest request, @RequestBody String payload) {
-        Store store = storeDao.findById((Long) request.getAttribute("storeId"))
+    public ResponseEntity<String> quote(HttpServletRequest request, @RequestBody MelhorEnvioQuoteRequest quote) {
+        Long storeId = (Long) request.getAttribute("storeId");
+        Store store = storeDao.findById(storeId)
                 .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
         if (store.getPlan() != StorePlan.COMPLETE) {
             throw new IllegalStateException("O Melhor Envio está disponível apenas no plano Completo.");
@@ -363,7 +375,15 @@ public class MelhorEnvioOauthController {
             throw new IllegalStateException("Melhor Envio ainda não foi conectado nesta loja.");
         }
 
-        okhttp3.RequestBody body = okhttp3.RequestBody.create(payload, MediaType.parse("application/json"));
+        String fingerprint = MelhorEnvioQuoteFingerprint.create(quote.items(), storeId, productDao);
+        String destinationZip = quote.destinationZip() == null ? "" : quote.destinationZip().replaceAll("\\D", "");
+        if (!destinationZip.matches("\\d{8}")) throw new IllegalArgumentException("Informe um CEP válido.");
+        PickupAddress origin = store.getMelhorEnvioOriginAddress();
+        if (origin == null || origin.zip() == null || !origin.zip().replaceAll("\\D", "").matches("\\d{8}")) {
+            throw new IllegalStateException("A loja ainda não configurou um endereço de postagem válido no Melhor Envio.");
+        }
+        JSONObject payload = buildQuotePayload(quote.items(), storeId, origin.zip(), destinationZip);
+        okhttp3.RequestBody body = okhttp3.RequestBody.create(payload.toString(), MediaType.parse("application/json"));
         Request quoteRequest = new Request.Builder()
                 .url(apiBaseUrl() + "/api/v2/me/shipment/calculate")
                 .post(body)
@@ -385,15 +405,74 @@ public class MelhorEnvioOauthController {
                             .build();
                     try (Response retryResponse = new OkHttpClient().newCall(retryRequest).execute()) {
                         String retryBody = retryResponse.body() == null ? "{}" : retryResponse.body().string();
-                        return ResponseEntity.status(retryResponse.code()).body(retryBody);
+                        return quoteResponse(retryResponse.code(), retryBody, storeId, destinationZip, fingerprint);
                     }
                 }
             }
             String responseBody = response.body() == null ? "{}" : response.body().string();
-            return ResponseEntity.status(response.code()).body(responseBody);
+            return quoteResponse(response.code(), responseBody, storeId, destinationZip, fingerprint);
         } catch (IOException exception) {
             throw new RuntimeException("Falha ao consultar o Melhor Envio", exception);
         }
+    }
+
+    private JSONObject buildQuotePayload(List<SaleItemRequest> items, Long storeId, String originZip, String destinationZip) {
+        JSONObject payload = new JSONObject();
+        payload.put("from", new JSONObject().put("postal_code", originZip.replaceAll("\\D", "")));
+        payload.put("to", new JSONObject().put("postal_code", destinationZip));
+        JSONArray products = new JSONArray();
+        for (SaleItemRequest item : items) {
+            Product product = productDao.selectProductByIdAndStore(item.getProductId(), storeId).orElseThrow();
+            int price = product.getPrice();
+            Integer promo = product.getPromo();
+            if (item.getVariationId() != null) {
+                ProductVariation variation = product.getVariations().stream()
+                        .filter(candidate -> item.getVariationId().equals(candidate.getId())).findFirst().orElseThrow();
+                price = variation.getPrice();
+                promo = variation.getPromo();
+            }
+            int finalPrice = promo == null || promo <= 0 ? price : BigDecimal.valueOf(price)
+                    .multiply(BigDecimal.valueOf(100L - promo)).divide(BigDecimal.valueOf(100), 0, RoundingMode.HALF_UP).intValue();
+            products.put(new JSONObject().put("name", product.getName()).put("quantity", item.getQuantity())
+                    .put("unitary_value", BigDecimal.valueOf(finalPrice).movePointLeft(2))
+                    .put("weight", product.getWeightKg()).put("width", product.getWidthCm())
+                    .put("height", product.getHeightCm()).put("length", product.getLengthCm()));
+        }
+        payload.put("products", products);
+        payload.put("options", new JSONObject().put("insurance_value", quoteSubtotal(items, storeId))
+                .put("receipt", false).put("own_hand", false).put("reverse", false).put("non_commercial", true));
+        return payload;
+    }
+
+    private BigDecimal quoteSubtotal(List<SaleItemRequest> items, Long storeId) {
+        return items.stream().map(item -> {
+            Product product = productDao.selectProductByIdAndStore(item.getProductId(), storeId).orElseThrow();
+            int price = product.getPrice(); Integer promo = product.getPromo();
+            if (item.getVariationId() != null) {
+                ProductVariation variation = product.getVariations().stream().filter(v -> item.getVariationId().equals(v.getId())).findFirst().orElseThrow();
+                price = variation.getPrice(); promo = variation.getPromo();
+            }
+            int finalPrice = promo == null || promo <= 0 ? price : BigDecimal.valueOf(price).multiply(BigDecimal.valueOf(100L-promo)).divide(BigDecimal.valueOf(100),0,RoundingMode.HALF_UP).intValue();
+            return BigDecimal.valueOf((long) finalPrice * item.getQuantity(), 2);
+        }).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private ResponseEntity<String> quoteResponse(int status, String body, Long storeId, String zip, String fingerprint) {
+        if (status < 200 || status >= 300) return ResponseEntity.status(status).body(body);
+        JSONArray quotes = responseArray(body, "quotes");
+        for (int i = 0; i < quotes.length(); i++) {
+            JSONObject quote = quotes.optJSONObject(i);
+            if (quote == null || quote.has("error") || !quote.has("id")) continue;
+            Object rawFee = quote.has("custom_price") ? quote.opt("custom_price") : quote.opt("price");
+            try {
+                long feeCents = new BigDecimal(String.valueOf(rawFee)).movePointRight(2).setScale(0, RoundingMode.HALF_UP).longValueExact();
+                String token = jwtUtil.issueToken("melhor-envio-checkout-quote", Map.of("storeId", storeId,
+                        "quoteId", String.valueOf(quote.get("id")), "quoteFeeCents", feeCents,
+                        "destinationZip", zip, "cartFingerprint", fingerprint), Duration.ofMinutes(20));
+                quote.put("kiziQuoteToken", token);
+            } catch (RuntimeException ignored) { }
+        }
+        return ResponseEntity.ok(quotes.toString());
     }
 
     @PostMapping("/sales/{saleId}/label")
@@ -429,7 +508,13 @@ public class MelhorEnvioOauthController {
                 .build();
         try (Response response = new OkHttpClient().newCall(refreshRequest).execute()) {
             if (!response.isSuccessful() || response.body() == null) return null;
-            return new JSONObject(response.body().string()).optString("access_token", null);
+            JSONObject tokenResponse = new JSONObject(response.body().string());
+            String refreshedToken = tokenResponse.optString("access_token", null);
+            String refreshedRefreshToken = tokenResponse.optString("refresh_token", null);
+            if (StringUtils.isNotBlank(refreshedRefreshToken)) {
+                store.setMelhorEnvioRefreshToken(refreshedRefreshToken);
+            }
+            return refreshedToken;
         }
     }
 

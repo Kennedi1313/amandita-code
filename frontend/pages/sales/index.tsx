@@ -17,6 +17,7 @@ import {
 } from "react-icons/fi";
 import Loading from "@/components/loading";
 import Image from "next/image";
+import { createProductReview, getMyReviewedSaleItems } from "@/lib/client";
 
 const Sales = () => {
   const { customer } = useAuth();
@@ -24,6 +25,9 @@ const Sales = () => {
   const [expandedSaleId, setExpandedSaleId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [reviewedItems, setReviewedItems] = useState<number[]>([]);
+  const [reviewDrafts, setReviewDrafts] = useState<Record<number, { rating: number; comment: string }>>({});
+  const [reviewMessage, setReviewMessage] = useState<Record<number, string>>({});
 
   const fetchSales = useCallback(async () => {
     if (!customer?.username) {
@@ -37,6 +41,12 @@ const Sales = () => {
       let saleList = response.data.content;
       setSales(saleList);
       setError("");
+      try {
+        const reviewResponse = await getMyReviewedSaleItems();
+        setReviewedItems(reviewResponse.data || []);
+      } catch {
+        setReviewedItems([]);
+      }
     } catch (err) {
       setError("Não foi possível carregar suas compras.");
     } finally {
@@ -374,6 +384,36 @@ const Sales = () => {
                                   </span>
                                 )}
                               </div>
+                              {sale.status?.toUpperCase() === "ENTREGUE" && item.id && (
+                                <div className="mt-3 border-t border-gray-100 pt-3">
+                                  {reviewedItems.includes(item.id) ? (
+                                    <p className="text-sm font-medium text-green-800">Obrigado por avaliar este produto.</p>
+                                  ) : (
+                                    <form className="grid gap-2 sm:grid-cols-[auto_1fr_auto] sm:items-end" onSubmit={async (event) => {
+                                      event.preventDefault();
+                                      const draft = reviewDrafts[item.id] || { rating: 5, comment: "" };
+                                      try {
+                                        await createProductReview({ saleItemId: item.id, rating: draft.rating, comment: draft.comment });
+                                        setReviewedItems((current) => [...current, item.id]);
+                                        setReviewMessage((current) => ({ ...current, [item.id]: "Avaliação publicada. Obrigado!" }));
+                                      } catch (reviewError: any) {
+                                        setReviewMessage((current) => ({ ...current, [item.id]: reviewError.response?.data?.message || "Não foi possível enviar a avaliação." }));
+                                      }
+                                    }}>
+                                      <label className="text-sm text-gray-700">Sua nota
+                                        <select aria-label="Nota do produto" className="mt-1 block min-h-10 rounded-lg border border-gray-300 bg-white px-2" value={reviewDrafts[item.id]?.rating ?? 5} onChange={(event) => setReviewDrafts((current) => ({ ...current, [item.id]: { rating: Number(event.target.value), comment: current[item.id]?.comment || "" } }))}>
+                                          {[5, 4, 3, 2, 1].map((rating) => <option key={rating} value={rating}>{rating} estrelas</option>)}
+                                        </select>
+                                      </label>
+                                      <label className="min-w-0 text-sm text-gray-700">Comentário (opcional)
+                                        <input maxLength={3000} className="mt-1 min-h-10 w-full rounded-lg border border-gray-300 px-3" value={reviewDrafts[item.id]?.comment || ""} onChange={(event) => setReviewDrafts((current) => ({ ...current, [item.id]: { rating: current[item.id]?.rating ?? 5, comment: event.target.value } }))} placeholder="Como foi sua experiência?" />
+                                      </label>
+                                      <button className="min-h-10 rounded-lg bg-gray-950 px-4 text-sm font-semibold text-white" type="submit">Avaliar</button>
+                                    </form>
+                                  )}
+                                  {reviewMessage[item.id] && <p role="status" className="mt-2 text-xs text-gray-600">{reviewMessage[item.id]}</p>}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );

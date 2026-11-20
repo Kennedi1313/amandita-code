@@ -39,12 +39,14 @@ jobs:
       matrix:
         include:
           - app: admin
-            node: "18"
+            node: "24"
+          - app: platform-admin
+            node: "24"
           - app: storefront
             directory: frontend
-            node: "20"
+            node: "24"
           - app: portal
-            node: "22"
+            node: "24"
     steps:
       - name: Check out source
         uses: actions/checkout@v4

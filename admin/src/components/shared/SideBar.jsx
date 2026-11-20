@@ -24,12 +24,14 @@ import {
   FiLogOut,
   FiMenu,
   FiPackage,
+  FiShoppingBag,
   FiTruck,
   FiCreditCard,
   FiLayers,
   FiSettings,
   FiTag,
   FiUsers,
+  FiStar,
 } from "react-icons/fi";
 import { FaWhatsapp } from "react-icons/fa";
 
@@ -102,6 +104,7 @@ const SidebarContent = ({ onClose, ...rest }) => {
   const administrar = [
     { name: "Clientes", route: "/dashboard/customers", icon: FiUsers },
     { name: "Produtos", route: "/dashboard/products", icon: FiPackage },
+    { name: "Avaliações", route: "/dashboard/reviews", icon: FiStar },
   ];
 
   const configuracao = [
@@ -158,6 +161,9 @@ const SidebarContent = ({ onClose, ...rest }) => {
         </Text>
         <NavItem route="/dashboard" icon={FiHome} onClick={onClose}>
           Início
+        </NavItem>
+        <NavItem route="/dashboard/sales" icon={FiShoppingBag} onClick={onClose}>
+          Vendas
         </NavItem>
         <Text px={3} pt={5} pb={1} fontSize="xs" fontWeight="bold" color="whiteAlpha.500" textTransform="uppercase" letterSpacing="wider">
           Administrar

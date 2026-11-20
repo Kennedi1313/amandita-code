@@ -1,12 +1,49 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
-import { FiSearch, FiX } from "react-icons/fi";
+import { FiLoader, FiSearch, FiX } from "react-icons/fi";
+import { getProductsByName } from "@/lib/productClient";
+import { Product } from "@/types/ProductTypes";
 
 export default function SearchBar({ iconColor = "currentColor" }: { iconColor?: string }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState(false);
   const mobileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      setSuggestionsError(false);
+      return;
+    }
+
+    let isCurrent = true;
+    const timeout = window.setTimeout(async () => {
+      setSuggestionsLoading(true);
+      setSuggestionsError(false);
+      try {
+        const response = await getProductsByName(query, 0);
+        if (isCurrent) setSuggestions((response.content || []).slice(0, 5));
+      } catch {
+        if (isCurrent) {
+          setSuggestions([]);
+          setSuggestionsError(true);
+        }
+      } finally {
+        if (isCurrent) setSuggestionsLoading(false);
+      }
+    }, 250);
+
+    return () => {
+      isCurrent = false;
+      window.clearTimeout(timeout);
+    };
+  }, [searchQuery]);
 
   useEffect(() => {
     if (isMobileSearchOpen) {
@@ -29,8 +66,59 @@ export default function SearchBar({ iconColor = "currentColor" }: { iconColor?: 
   const handleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
       setIsMobileSearchOpen(false);
+      setSuggestions([]);
     }
   };
+
+  const selectSuggestion = async (productId: string) => {
+    setSuggestions([]);
+    setIsMobileSearchOpen(false);
+    await router.push(`/details/${productId}`);
+  };
+
+  const suggestionList = searchQuery.trim().length >= 2 ? (
+    <div
+      role="listbox"
+      aria-label="Sugestões de produtos"
+      className="absolute inset-x-0 top-full z-[60] mt-2 overflow-hidden rounded-2xl border border-gray-200 bg-white py-1 text-gray-900 shadow-xl"
+    >
+      {suggestionsLoading ? (
+        <p className="flex items-center gap-2 px-4 py-3 text-sm text-gray-500" role="status">
+          <FiLoader className="animate-spin" aria-hidden="true" /> Buscando produtos…
+        </p>
+      ) : suggestions.length ? (
+        <>
+          {suggestions.map((product) => (
+            <button
+              key={product.id}
+              type="button"
+              role="option"
+              aria-selected="false"
+              onClick={() => selectSuggestion(String(product.id))}
+              className="flex w-full items-center justify-between gap-4 px-4 py-3 text-left transition hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium">{product.name}</span>
+                {product.category ? <span className="block truncate text-xs text-gray-500">{product.category}</span> : null}
+              </span>
+              <span className="shrink-0 text-sm font-semibold">{product.price}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => handleSearch()}
+            className="w-full border-t border-gray-100 px-4 py-3 text-left text-sm font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            Ver todos os resultados para “{searchQuery.trim()}”
+          </button>
+        </>
+      ) : (
+        <p className="px-4 py-3 text-sm text-gray-500">
+          {suggestionsError ? "Não foi possível carregar sugestões. Tente novamente." : "Nenhum produto encontrado."}
+        </p>
+      )}
+    </div>
+  ) : null;
 
   return (
     <>
@@ -70,6 +158,7 @@ export default function SearchBar({ iconColor = "currentColor" }: { iconColor?: 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
+              aria-autocomplete="list"
               />
             </div>
             <button
@@ -80,6 +169,7 @@ export default function SearchBar({ iconColor = "currentColor" }: { iconColor?: 
             >
               <FiX className="text-2xl" />
             </button>
+            {suggestionList}
           </form>
         </div>
       )}
@@ -107,8 +197,10 @@ export default function SearchBar({ iconColor = "currentColor" }: { iconColor?: 
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyDown={handleKeyDown}
+          aria-autocomplete="list"
         />
       </div>
+      {suggestionList}
       </form>
     </>
   );

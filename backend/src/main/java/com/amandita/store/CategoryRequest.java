@@ -5,6 +5,7 @@ public record CategoryRequest(
         java.math.BigDecimal weightKg,
         Integer widthCm,
         Integer heightCm,
-        Integer lengthCm
+        Integer lengthCm,
+        Long parentId
 ) {
 }

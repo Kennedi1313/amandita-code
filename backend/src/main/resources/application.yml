@@ -1,7 +1,7 @@
 server:
   port: 8080
   error:
-    include-message: always
+    include-message: ${SERVER_ERROR_INCLUDE_MESSAGE:never}
   ssl:
     key-store-type: PKCS12
     key-store: classpath:keystore/amandita.p12
@@ -60,6 +60,9 @@ mercadopago:
 saas:
   base-domain: ${SAAS_BASE_DOMAIN:mostradigital.com.br}
   admin-url: ${SAAS_ADMIN_URL:https://admin.mostradigital.com.br}
+
+platform-admin:
+  access-token: ${PLATFORM_ADMIN_ACCESS_TOKEN:}
 
 local-delivery:
   geocoder-url: ${LOCAL_DELIVERY_GEOCODER_URL:https://cep.awesomeapi.com.br/json}

@@ -1,4 +1,4 @@
-FROM node:22.17
+FROM node:24-bookworm-slim
 ARG api_url=/api/v1
 ARG base_domain=mostradigital.com.br
 ARG admin_url=http://localhost:4173
@@ -18,5 +18,7 @@ COPY package*.json .
 RUN npm ci
 COPY . .
 RUN npm run build
+RUN chown -R node:node /app
+USER node
 EXPOSE 5174
 CMD ["npm", "run", "start"]

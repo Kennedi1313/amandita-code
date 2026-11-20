@@ -9,13 +9,13 @@ import org.springframework.stereotype.Service;
 
 import java.security.Key;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static java.time.temporal.ChronoUnit.DAYS;
 
 @Service
 public class JWTUtil {
@@ -49,6 +49,13 @@ public class JWTUtil {
     public String issueToken(
             String subject,
             Map<String, Object> claims) {
+        return issueToken(subject, claims, Duration.ofDays(15));
+    }
+
+    public String issueToken(String subject, Map<String, Object> claims, Duration lifetime) {
+        if (lifetime == null || lifetime.isZero() || lifetime.isNegative()) {
+            throw new IllegalArgumentException("Token lifetime must be positive.");
+        }
         String token = Jwts
                 .builder()
                 .setClaims(claims)
@@ -57,7 +64,7 @@ public class JWTUtil {
                 .setIssuedAt(Date.from(Instant.now()))
                 .setExpiration(
                         Date.from(
-                                Instant.now().plus(15, DAYS)
+                                Instant.now().plus(lifetime)
                         )
                 )
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
@@ -100,6 +107,10 @@ public class JWTUtil {
                 .parseClaimsJws(token)
                 .getBody();
         return claims.get("storeId", Long.class);
+    }
+
+    public Object getClaim(String token, String claimName) {
+        return getClaims(token).get(claimName);
     }
 
     public boolean hasScope(String token, String scope) {

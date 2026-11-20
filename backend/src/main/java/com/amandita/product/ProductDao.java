@@ -12,6 +12,9 @@ public interface ProductDao {
     Page<Product> findProductsByCategoryByStore(String category, int page, int size, Long storeId);
     Page<Product> findPublishedProductsByCategoryByStore(String category, int page, int size, Long storeId);
     Page<Product> findProductsByCategory(String category, int page, int size);
+    Page<Product> findProductsByCategoriesByStore(List<String> categories, int page, int size, Long storeId,
+                                                  boolean publishedOnly, boolean promoOnly, boolean inStockOnly,
+                                                  Integer minPrice, Integer maxPrice, String sort);
     Page<Product> findProductsByNameByStore(String query, int page, int size, Long storeId);
     Page<Product> findPublishedProductsByNameByStore(String query, int page, int size, Long storeId);
     Page<Product> findProductsByName(String query, int page, int size);

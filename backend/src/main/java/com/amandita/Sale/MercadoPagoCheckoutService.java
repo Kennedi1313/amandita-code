@@ -4,6 +4,9 @@ import com.amandita.store.MercadoPagoOAuthService;
 import com.amandita.store.Store;
 import com.amandita.store.StoreDao;
 import com.amandita.store.StorePlan;
+import com.amandita.jwt.JWTUtil;
+import com.amandita.product.ProductDao;
+import com.amandita.store.MelhorEnvioQuoteFingerprint;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.commons.lang3.StringUtils;
@@ -14,12 +17,15 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 public class MercadoPagoCheckoutService {
@@ -32,13 +38,16 @@ public class MercadoPagoCheckoutService {
     private final String webhookSecret;
     private final String returnBaseUrl;
     private final String marketplaceFee;
+    private final JWTUtil jwtUtil;
+    private final ProductDao productDao;
 
     public MercadoPagoCheckoutService(AsaasCheckoutService saleCheckout, SaleDao saleDao, StoreDao storeDao,
                                       MercadoPagoOAuthService mercadoPagoOAuthService, ObjectMapper objectMapper,
                                       @Value("${mercadopago.webhook-url:}") String webhookUrl,
                                       @Value("${mercadopago.webhook-secret:}") String webhookSecret,
                                       @Value("${mercadopago.return-base-url:}") String returnBaseUrl,
-                                      @Value("${mercadopago.marketplace-fee:}") String marketplaceFee) {
+                                      @Value("${mercadopago.marketplace-fee:}") String marketplaceFee,
+                                      JWTUtil jwtUtil, ProductDao productDao) {
         this.saleCheckout = saleCheckout;
         this.saleDao = saleDao;
         this.storeDao = storeDao;
@@ -48,6 +57,8 @@ public class MercadoPagoCheckoutService {
         this.webhookSecret = webhookSecret;
         this.returnBaseUrl = returnBaseUrl;
         this.marketplaceFee = marketplaceFee;
+        this.jwtUtil = jwtUtil;
+        this.productDao = productDao;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -67,10 +78,23 @@ public class MercadoPagoCheckoutService {
             throw new IllegalStateException("Conecte primeiro a conta Mercado Pago desta loja.");
         }
         if (request == null || request.saleRequest() == null) throw new IllegalArgumentException("Carrinho vazio.");
+        validateShippingQuote(request.saleRequest(), storeId);
 
+        String guestAccessToken = StringUtils.isBlank(authenticatedEmail)
+                ? UUID.randomUUID().toString() + UUID.randomUUID()
+                : null;
         Sale sale = saleCheckout.createPendingSaleForProvider(
-                request.saleRequest(), storeId, authenticatedEmail, "MERCADO_PAGO");
+                request.saleRequest(), storeId, authenticatedEmail, "MERCADO_PAGO", guestAccessToken);
         String baseUrl = storefrontBaseUrl(store);
+        String successUrl = baseUrl + "/success?provider=mercadopago&saleId=" + sale.getId()
+                + "&payment=approved";
+        String pendingUrl = baseUrl + "/success?provider=mercadopago&saleId=" + sale.getId()
+                + "&payment=pending";
+        if (guestAccessToken != null) {
+            String encodedToken = URLEncoder.encode(guestAccessToken, StandardCharsets.UTF_8);
+            successUrl += "&guestToken=" + encodedToken;
+            pendingUrl += "&guestToken=" + encodedToken;
+        }
         Map<String, Object> preference = new LinkedHashMap<>();
         preference.put("items", buildItems(sale));
         preference.put("external_reference", String.valueOf(sale.getId()));
@@ -79,13 +103,20 @@ public class MercadoPagoCheckoutService {
         preference.put("expires", true);
         preference.put("expiration_date_from", expirationStart.toString());
         preference.put("expiration_date_to", expirationStart.plusHours(24).toString());
+        String failureUrl = baseUrl + "/payment/return?provider=mercadopago&saleId=" + sale.getId() + "&payment=failed";
+        if (guestAccessToken != null) {
+            failureUrl += "&guestToken=" + URLEncoder.encode(guestAccessToken, StandardCharsets.UTF_8);
+        }
         preference.put("back_urls", Map.of(
-                "success", baseUrl + "/success?provider=mercadopago&saleId=" + sale.getId() + "&payment=approved",
-                "pending", baseUrl + "/success?provider=mercadopago&saleId=" + sale.getId() + "&payment=pending",
-                "failure", baseUrl + "/checkout?payment=failed"
+                "success", successUrl,
+                "pending", pendingUrl,
+                "failure", failureUrl
         ));
         preference.put("auto_return", "approved");
-        preference.put("payer", Map.of("email", sale.getCustomer().getEmail()));
+        String payerEmail = sale.getCustomer() != null
+                ? sale.getCustomer().getEmail()
+                : sale.getGuestEmail();
+        preference.put("payer", Map.of("email", payerEmail));
         preference.put("statement_descriptor", statementDescriptor(store.getName()));
         addMarketplaceFee(preference, sale);
 
@@ -101,7 +132,31 @@ public class MercadoPagoCheckoutService {
         }
         sale.setPreferenceId(preferenceId);
         saleDao.insertSale(sale);
-        return new MercadoPagoCheckoutResponse(sale.getId(), preferenceId, checkoutUrl);
+        return new MercadoPagoCheckoutResponse(sale.getId(), preferenceId, checkoutUrl, guestAccessToken);
+    }
+
+    private void validateShippingQuote(SaleRequest saleRequest, Long storeId) {
+        if (saleRequest.getShippingMethod() == null || !saleRequest.getShippingMethod().startsWith("melhor_envio:")) return;
+        try {
+            String token = saleRequest.getShippingQuoteToken();
+            if (StringUtils.isBlank(token) || !"melhor-envio-checkout-quote".equals(jwtUtil.getSubject(token))) {
+                throw new IllegalArgumentException();
+            }
+            String quoteId = saleRequest.getShippingMethod().substring("melhor_envio:".length());
+            String zip = saleRequest.getShippingZip() == null ? "" : saleRequest.getShippingZip().replaceAll("\\D", "");
+            Object tokenStore = jwtUtil.getClaim(token, "storeId");
+            Object tokenFee = jwtUtil.getClaim(token, "quoteFeeCents");
+            boolean matches = String.valueOf(storeId).equals(String.valueOf(tokenStore))
+                    && quoteId.equals(String.valueOf(jwtUtil.getClaim(token, "quoteId")))
+                    && zip.equals(String.valueOf(jwtUtil.getClaim(token, "destinationZip")))
+                    && saleRequest.getShippingFee() != null
+                    && new BigDecimal(String.valueOf(tokenFee)).compareTo(saleRequest.getShippingFee()) == 0
+                    && MelhorEnvioQuoteFingerprint.create(saleRequest.getSaleItemRequests(), storeId, productDao)
+                    .equals(jwtUtil.getClaim(token, "cartFingerprint"));
+            if (!matches) throw new IllegalArgumentException();
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("A cotação do Melhor Envio expirou ou mudou. Calcule o frete novamente.", exception);
+        }
     }
 
     private List<Map<String, Object>> buildItems(Sale sale) {

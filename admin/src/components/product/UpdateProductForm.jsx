@@ -27,6 +27,7 @@ import MyDropzone from "./MyDropZone.jsx";
 import ProductVariationEditor, {
   prepareSimpleVariationsForSave,
 } from "./ProductVariationEditor.jsx";
+import CategorySelect from "./CategorySelect.jsx";
 
 const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
   let [categories, setCategories] = useState([]);
@@ -231,25 +232,7 @@ const UpdateProductForm = ({ fetchProducts, initialValues, productId }) => {
               />
             </Box>
 
-            <MySelectInput
-              label="Categoria"
-              name="category"
-              marginBottom={"3rem"}
-              borderColor="#e4f2d5"
-              focusBorderColor="#1f633c"
-            >
-              <option disabled value="">
-                (Selecione uma categoria)
-              </option>
-              {categories.map((category) => (
-                <option
-                  key={category.id}
-                  value={category.path.split("/").pop()}
-                >
-                  {category.name}
-                </option>
-              ))}
-            </MySelectInput>
+            <CategorySelect categories={categories} />
           </Stack>
 
           {/* VARIAÇÕES */}

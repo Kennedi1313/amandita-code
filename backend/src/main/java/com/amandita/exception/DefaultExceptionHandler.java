@@ -9,6 +9,7 @@ import org.springframework.security.authentication.InsufficientAuthenticationExc
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.logging.Level;
@@ -133,6 +134,22 @@ public class DefaultExceptionHandler {
         );
 
         return new ResponseEntity<>(apiError, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ApiError> handleResponseStatusException(
+            ResponseStatusException e,
+            HttpServletRequest request) {
+        HttpStatus status = HttpStatus.valueOf(e.getStatusCode().value());
+        String message = e.getReason() == null ? status.getReasonPhrase() : e.getReason();
+        ApiError apiError = new ApiError(
+                request.getRequestURI(),
+                message,
+                status.value(),
+                LocalDateTime.now()
+        );
+
+        return new ResponseEntity<>(apiError, status);
     }
 
     @ExceptionHandler(Exception.class)

@@ -1,0 +1,5 @@
+ALTER TABLE sale
+    ADD COLUMN IF NOT EXISTS guest_name VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS guest_email VARCHAR(255),
+    ADD COLUMN IF NOT EXISTS guest_phone VARCHAR(32),
+    ADD COLUMN IF NOT EXISTS guest_access_token_hash VARCHAR(64);

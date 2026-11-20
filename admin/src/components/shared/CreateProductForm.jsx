@@ -25,6 +25,7 @@ import MyDropzone from "../product/MyDropZone.jsx";
 import ProductVariationEditor, {
   prepareSimpleVariationsForSave,
 } from "../product/ProductVariationEditor.jsx";
+import CategorySelect from "../product/CategorySelect.jsx";
 
 const CreateProductForm = ({ fetchProducts }) => {
   const [existingImages, setExistingImages] = useState([]);
@@ -213,24 +214,7 @@ const CreateProductForm = ({ fetchProducts }) => {
                 />
               </Box>
 
-              <MySelectInput
-                label="Categoria"
-                name="category"
-                borderColor="#e4f2d5"
-                focusBorderColor="#1f633c"
-              >
-                <option disabled value="">
-                  (Selecione uma categoria)
-                </option>
-                {categories.map((category) => (
-                  <option
-                    key={category.id}
-                    value={category.path.split("/").pop()}
-                  >
-                    {category.name}
-                  </option>
-                ))}
-              </MySelectInput>
+              <CategorySelect categories={categories} />
             </Stack>
 
             <Stack marginBottom={"3rem"}>

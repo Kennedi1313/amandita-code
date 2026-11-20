@@ -48,6 +48,10 @@ require_https_url() {
 require_env_value SAAS_BASE_DOMAIN
 require_env_value GOOGLE_CLIENT_ID
 require_env_value CORS_ALLOWED_ORIGINS
+if ! awk -F= '/^PLATFORM_ADMIN_ACCESS_TOKEN=/ { if (length($2) >= 32) valid = 1 } END { exit !valid }' "$app_dir/.env"; then
+  echo "Set PLATFORM_ADMIN_ACCESS_TOKEN to a random value with at least 32 characters in the VPS .env."
+  exit 1
+fi
 require_https_url APP_PUBLIC_API_URL
 require_https_url APP_PUBLIC_API_V1_URL
 require_https_url SAAS_ADMIN_URL
@@ -67,12 +71,14 @@ docker compose up --detach --build --remove-orphans \
   amandita-db \
   amandita-api \
   amandita-admin \
+  amandita-platform-admin \
   amandita-frontend \
   amandita-portal
 
 for attempt in $(seq 1 40); do
   if curl --fail --silent http://127.0.0.1:8080/actuator/health >/dev/null \
     && curl --fail --silent http://127.0.0.1:4173/ >/dev/null \
+    && curl --fail --silent http://127.0.0.1:4174/ >/dev/null \
     && curl --fail --silent http://127.0.0.1:3000/ >/dev/null \
     && curl --fail --silent http://127.0.0.1:5174/ >/dev/null; then
     printf '%s\n' "$revision" > .deployed-revision

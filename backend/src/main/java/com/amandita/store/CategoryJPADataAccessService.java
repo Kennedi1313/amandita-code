@@ -43,6 +43,7 @@ public class CategoryJPADataAccessService implements CategoryDao {
         Category category = new Category();
         category.setName(cleanName);
         category.setPath(toPath(cleanName));
+        category.setParent(findParent(storeId, request.parentId(), null));
         applyDefaults(category, request);
         category.setStore(store);
         return categoryRepository.save(category);
@@ -63,6 +64,9 @@ public class CategoryJPADataAccessService implements CategoryDao {
 
         category.setName(cleanName);
         category.setPath(newPath);
+        if (request.parentId() != null) {
+            category.setParent(findParent(storeId, request.parentId(), categoryId));
+        }
         applyDefaults(category, request);
         Category saved = categoryRepository.save(category);
 
@@ -95,6 +99,9 @@ public class CategoryJPADataAccessService implements CategoryDao {
         if (StringUtils.isNotBlank(slug) && productRepository.existsByStoreIdAndCategory(storeId, slug)) {
             throw new ResourceConflictException("Não é possível remover uma categoria que possui produtos.");
         }
+        if (categoryRepository.existsByStoreIdAndParent_Id(storeId, categoryId)) {
+            throw new ResourceConflictException("Mova ou remova as subcategorias antes de excluir esta categoria.");
+        }
         categoryRepository.delete(category);
     }
 
@@ -105,6 +112,21 @@ public class CategoryJPADataAccessService implements CategoryDao {
             throw new ResourceNotFoundException("Categoria não encontrada nesta loja.");
         }
         return category;
+    }
+
+    private Category findParent(Long storeId, Long parentId, Long categoryId) {
+        if (parentId == null || parentId == 0) return null;
+        Category parent = findStoreCategory(storeId, parentId);
+        if (categoryId != null) {
+            Category current = parent;
+            while (current != null) {
+                if (categoryId.equals(current.getId())) {
+                    throw new IllegalArgumentException("Uma categoria não pode ser filha dela mesma ou de uma descendente.");
+                }
+                current = current.getParent();
+            }
+        }
+        return parent;
     }
 
     private String validateName(String name) {

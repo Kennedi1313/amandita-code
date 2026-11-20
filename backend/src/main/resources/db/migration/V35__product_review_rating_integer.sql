@@ -1,0 +1,2 @@
+ALTER TABLE product_review
+    ALTER COLUMN rating TYPE INTEGER USING rating::INTEGER;

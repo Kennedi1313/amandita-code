@@ -42,6 +42,21 @@ public class ProductJPADataAccessService implements ProductDao {
     }
 
     @Override
+    public Page<Product> findProductsByCategoriesByStore(List<String> categories, int page, int size, Long storeId,
+                                                         boolean publishedOnly, boolean promoOnly, boolean inStockOnly,
+                                                         Integer minPrice, Integer maxPrice, String sort) {
+        Sort order = switch (sort == null ? "newest" : sort) {
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
+            case "name" -> Sort.by(Sort.Direction.ASC, "name");
+            default -> Sort.by(Sort.Direction.DESC, "id");
+        };
+        Pageable pageable = PageRequest.of(page, size, order);
+        return productRepository.filterCategoryProducts(storeId, categories, publishedOnly, promoOnly,
+                inStockOnly, minPrice, maxPrice, pageable);
+    }
+
+    @Override
     public Page<Product> findPublishedProductsByCategoryByStore(String category, int page, int size, Long storeId) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "id"));
         return productRepository.findByStoreIdAndCategoryAndActiveTrueAndPublishedTrue(storeId, category, pageable);

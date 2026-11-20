@@ -74,12 +74,17 @@ public class ProductController {
             @RequestParam("category") String category,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestParam(name = "promo", defaultValue = "false") boolean promoOnly,
+            @RequestParam(name = "inStock", defaultValue = "false") boolean inStockOnly,
+            @RequestParam(name = "minPrice", required = false) Integer minPrice,
+            @RequestParam(name = "maxPrice", required = false) Integer maxPrice,
+            @RequestParam(name = "sort", defaultValue = "newest") String sort,
             HttpServletRequest httpRequest,
             Authentication authentication) {
         Long storeId = (Long) httpRequest.getAttribute("storeId");
         return isAdmin(authentication)
-                ? productService.findProductsByCategoryByStore(category, page, size, storeId)
-                : productService.findPublishedProductsByCategoryByStore(category, page, size, storeId);
+                ? productService.findProductsByCategoryByStore(category, page, size, storeId, promoOnly, inStockOnly, minPrice, maxPrice, sort)
+                : productService.findPublishedProductsByCategoryByStore(category, page, size, storeId, promoOnly, inStockOnly, minPrice, maxPrice, sort);
     }
 
     @GetMapping("/by-category/no-store")

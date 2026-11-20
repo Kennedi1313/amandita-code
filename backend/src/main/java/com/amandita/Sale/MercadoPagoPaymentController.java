@@ -5,6 +5,7 @@ import org.apache.commons.lang3.StringUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +17,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 
 @RestController
 @RequestMapping("/api/v1/payment/mercadopago")
@@ -39,7 +45,7 @@ public class MercadoPagoPaymentController {
         Long storeId = (Long) request.getAttribute("storeId");
         try {
             return ResponseEntity.ok(checkoutService.createCheckout(
-                    checkoutRequest, storeId, authenticatedEmail(authentication)));
+                    checkoutRequest, storeId, checkoutEmail(authentication)));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (IllegalStateException e) {
@@ -90,6 +96,45 @@ public class MercadoPagoPaymentController {
                 .filter(sale -> sale.getCustomer() != null && StringUtils.equalsIgnoreCase(email, sale.getCustomer().getEmail()))
                 .<ResponseEntity<?>>map(sale -> ResponseEntity.ok(new MercadoPagoSaleStatus(sale.getId(), sale.getStatus())))
                 .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/guest-sale/{saleId}")
+    public ResponseEntity<?> guestSaleStatus(@PathVariable Long saleId,
+                                             @RequestParam String token,
+                                             HttpServletRequest request) {
+        Long storeId = (Long) request.getAttribute("storeId");
+        if (storeId == null || StringUtils.isBlank(token)) {
+            return ResponseEntity.notFound().build();
+        }
+        return saleDao.findByIdAndStoreId(saleId, storeId)
+                .filter(sale -> sale.getGuestAccessTokenHash() != null
+                        && tokenMatches(sale.getGuestAccessTokenHash(), token))
+                .<ResponseEntity<?>>map(sale -> ResponseEntity.ok(
+                        new MercadoPagoSaleStatus(sale.getId(), sale.getStatus())))
+                .orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    private boolean tokenMatches(String savedHash, String token) {
+        try {
+            String receivedHash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8)));
+            return MessageDigest.isEqual(
+                    savedHash.getBytes(StandardCharsets.US_ASCII),
+                    receivedHash.getBytes(StandardCharsets.US_ASCII));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("Não foi possível validar o acesso ao pedido.", exception);
+        }
+    }
+
+    private String checkoutEmail(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            return null;
+        }
+        if (authentication.getPrincipal() instanceof Customer customer) {
+            return customer.getEmail();
+        }
+        throw new IllegalArgumentException("A sessão autenticada não corresponde a um cliente.");
     }
 
     private String authenticatedEmail(Authentication authentication) {

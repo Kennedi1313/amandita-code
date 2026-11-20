@@ -8,6 +8,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @Configuration
 public class CorsConfig {
@@ -29,7 +30,11 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(allowedMethods);
-        configuration.setAllowedHeaders(allowedHeaders);
+        List<String> requestHeaders = new ArrayList<>(allowedHeaders);
+        if (!requestHeaders.contains("*")) {
+            requestHeaders.add("X-Platform-Admin-Token");
+        }
+        configuration.setAllowedHeaders(requestHeaders);
         configuration.setExposedHeaders(expectedHeaders);
         // Authentication is sent explicitly as a store-scoped bearer token; never allow ambient cookies.
         configuration.setAllowCredentials(false);

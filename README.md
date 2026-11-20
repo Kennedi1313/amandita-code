@@ -4,6 +4,7 @@ This repository contains a small Docker Compose application with three frontend 
 
 - `portal/` — Vite + React SaaS landing and store signup flow
 - `admin/` — Vite + React admin dashboard
+- `platform-admin/` — Vite + React private dashboard for the Amandita platform owner
 - `frontend/` — Next.js storefront
 - `backend/` — Spring Boot API service
 - `db/` — PostgreSQL database
@@ -21,6 +22,7 @@ This monorepo structure is a good fit for a small project using Docker Compose, 
 
 - `portal/` — public SaaS portal powered by Vite and React
 - `admin/` — admin web UI powered by Vite and React
+- `platform-admin/` — private platform-wide admin UI powered by Vite and React
 - `frontend/` — public storefront built with Next.js
 - `backend/` — Java Spring Boot API
 - `db/` — database service Dockerfile and configuration
@@ -34,9 +36,13 @@ This monorepo structure is a good fit for a small project using Docker Compose, 
 docker compose up --build
 ```
 
+O túnel ngrok fica fora da inicialização padrão. Para testar webhooks localmente,
+suba-o explicitamente com `docker compose --profile webhook-tunnel up -d amandita-ngrok`.
+
 Open the services in your browser:
 
 - Admin: `http://localhost:4173`
+- Platform admin: `http://localhost:4174` (requires `PLATFORM_ADMIN_ACCESS_TOKEN` in the API environment)
 - Storefront: `http://localhost:3000`
 - Portal: `http://localhost:5174`
 - API: `http://localhost:8080`
@@ -78,8 +84,10 @@ See the service README files for details:
 - `admin/README.md`
 - `frontend/README.md`
 - `backend/README.md`
+- `platform-admin/README.md`
 
 For the GitHub Actions staging deployment and VPS configuration, see [`STAGING-DEPLOY.md`](STAGING-DEPLOY.md).
+For the release checklist and external checks that still require the VPS, see [`PRODUCTION-READINESS.md`](PRODUCTION-READINESS.md).
 
 ## Notes
 

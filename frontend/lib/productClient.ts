@@ -6,6 +6,13 @@ const PROMO_PAGE_SIZE = 500;
 const DEFAULT_API_BASE_URL = "http://localhost:8080/api/v1";
 const DEFAULT_API_BUILD_URL = DEFAULT_API_BASE_URL;
 
+export const hasProductPromotion = (product: {
+  promo?: number | string;
+  variations?: { promo?: number | string }[];
+}) =>
+  Number(product.promo || 0) > 0 ||
+  (product.variations || []).some((variation) => Number(variation.promo || 0) > 0);
+
 const getBuildApiBaseUrl = () => {
   return (
     process.env.NEXT_PUBLIC_API_BUILD_URL || DEFAULT_API_BUILD_URL
@@ -176,13 +183,27 @@ export const getProductsByCategory = async (
   category: string,
   page: number,
   url?: string,
+  filters: {
+    promo?: boolean;
+    minPrice?: number | null;
+    maxPrice?: number | null;
+    sort?: string;
+  } = {},
 ) => {
   try {
     const params = new URLSearchParams({
       category,
       page: String(page),
       size: String(PAGE_SIZE),
+      promo: String(Boolean(filters.promo)),
+      sort: filters.sort || "newest",
     });
+    if (filters.minPrice != null) {
+      params.set("minPrice", String(filters.minPrice));
+    }
+    if (filters.maxPrice != null) {
+      params.set("maxPrice", String(filters.maxPrice));
+    }
     const endpoint =
       category === "promo"
         ? `${getUrl()}?page=0&size=${PROMO_PAGE_SIZE}`
@@ -191,7 +212,7 @@ export const getProductsByCategory = async (
     const data: ProductsResponse = res.data;
 
     if (category === "promo") {
-      data.content = data.content.filter((product) => product.promo > 0);
+      data.content = data.content.filter(hasProductPromotion);
       data.totalElements = data.content.length;
     }
 
@@ -220,7 +241,7 @@ export const getProductsByCategoryNoStore = async (
     const data: ProductsResponse = res.data;
 
     if (category === "promo") {
-      data.content = data.content.filter((product) => product.promo > 0);
+      data.content = data.content.filter(hasProductPromotion);
       data.totalElements = data.content.length;
     }
 

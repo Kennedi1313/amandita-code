@@ -16,6 +16,7 @@ Amandita is a small monorepo with three main services:
 - `backend/` — Spring Boot API service using Java 21
 - `frontend/` — Next.js customer storefront
 - `admin/` — Vite + React admin dashboard
+- `platform-admin/` — Vite + React platform-wide admin dashboard
 - `portal/` — Vite + React SaaS portal and store signup flow
 - `db/` — PostgreSQL container support
 - `docker-compose.yml` — local orchestration of the full stack
@@ -55,6 +56,7 @@ This repository is designed for local Docker Compose development and service-lev
 - Backend API: `http://localhost:8080`
 - Frontend dev: `http://localhost:3000`
 - Admin dev: `http://localhost:4173`
+- Platform admin dev: `http://localhost:4174`
 - Portal dev: `http://localhost:5174`
 
 Domain topology:
@@ -68,6 +70,7 @@ Validation commands:
 ```bash
 cd backend && mvn clean test-compile
 cd admin && npm install && npm run build
+cd platform-admin && npm install && npm run build
 cd frontend && npm install && npm run build
 cd portal && npm install && npm run build
 docker compose up --build

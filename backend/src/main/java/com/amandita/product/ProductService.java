@@ -76,13 +76,48 @@ public class ProductService {
 
     @SuppressWarnings("unchecked")
     public Page<ProductDTO> findProductsByCategoryByStore(String category, int page, int size, Long storeId) {
-        return productDao.findProductsByCategoryByStore(category, page, size, storeId)
+        return findProductsByCategoryByStore(category, page, size, storeId, false, false, null, null, "newest");
+    }
+
+    public Page<ProductDTO> findProductsByCategoryByStore(String category, int page, int size, Long storeId,
+                                                         boolean promoOnly, boolean inStockOnly,
+                                                         Integer minPrice, Integer maxPrice, String sort) {
+        return productDao.findProductsByCategoriesByStore(getCategorySlugs(category, storeId), page, size,
+                        storeId, false, promoOnly, inStockOnly, minPrice, maxPrice, sort)
                 .map(productDTOMapper);
     }
 
     public Page<ProductDTO> findPublishedProductsByCategoryByStore(String category, int page, int size, Long storeId) {
-        return productDao.findPublishedProductsByCategoryByStore(category, page, size, storeId)
+        return findPublishedProductsByCategoryByStore(category, page, size, storeId, false, false, null, null, "newest");
+    }
+
+    public Page<ProductDTO> findPublishedProductsByCategoryByStore(String category, int page, int size, Long storeId,
+                                                                    boolean promoOnly, boolean inStockOnly,
+                                                                    Integer minPrice, Integer maxPrice, String sort) {
+        return productDao.findProductsByCategoriesByStore(getCategorySlugs(category, storeId), page, size,
+                        storeId, true, promoOnly, inStockOnly, minPrice, maxPrice, sort)
                 .map(productDTOMapper);
+    }
+
+    private List<String> getCategorySlugs(String slug, Long storeId) {
+        if (categoryRepository == null) return List.of(slug);
+        List<Category> categories = categoryRepository.findAllByStoreId(storeId);
+        Map<Long, List<Category>> children = categories.stream()
+                .filter(category -> category.getParentId() != null)
+                .collect(Collectors.groupingBy(Category::getParentId));
+        Category root = categories.stream()
+                .filter(category -> category.getPath() != null && category.getPath().endsWith("/" + slug))
+                .findFirst().orElse(null);
+        if (root == null) return List.of(slug);
+        List<String> slugs = new ArrayList<>();
+        Deque<Category> pending = new ArrayDeque<>();
+        pending.add(root);
+        while (!pending.isEmpty()) {
+            Category current = pending.removeFirst();
+            slugs.add(current.getPath().substring(current.getPath().lastIndexOf('/') + 1));
+            pending.addAll(children.getOrDefault(current.getId(), List.of()));
+        }
+        return slugs;
     }
 
     @SuppressWarnings("unchecked")

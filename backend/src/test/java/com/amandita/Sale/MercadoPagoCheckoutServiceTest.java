@@ -6,6 +6,8 @@ import com.amandita.store.MercadoPagoOAuthService;
 import com.amandita.store.Store;
 import com.amandita.store.StoreDao;
 import com.amandita.store.StorePlan;
+import com.amandita.jwt.JWTUtil;
+import com.amandita.product.ProductDao;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -30,7 +32,7 @@ class MercadoPagoCheckoutServiceTest {
                 "https://example.com/api/v1/payment/mercadopago/webhook",
                 "webhook-secret",
                 "",
-                "");
+                "", mock(JWTUtil.class), mock(ProductDao.class));
         Store store = new Store();
         store.setDomain("localhost");
 
@@ -46,7 +48,8 @@ class MercadoPagoCheckoutServiceTest {
         ObjectMapper objectMapper = new ObjectMapper();
         MercadoPagoCheckoutService service = new MercadoPagoCheckoutService(
                 saleCheckout, saleDao, storeDao, mercadoPagoOAuthService, objectMapper,
-                "https://example.com/api/v1/payment/mercadopago/webhook", "webhook-secret", "", "");
+                "https://example.com/api/v1/payment/mercadopago/webhook", "webhook-secret", "", "",
+                mock(JWTUtil.class), mock(ProductDao.class));
 
         Store store = new Store();
         store.setId(7L);
@@ -73,7 +76,8 @@ class MercadoPagoCheckoutServiceTest {
         sale.setCustomer(customer);
         sale.setSaleItems(List.of(saleItem));
         sale.setTotalPrice(2900.0);
-        when(saleCheckout.createPendingSaleForProvider(any(), eq(7L), eq("cliente@example.com"), eq("MERCADO_PAGO")))
+        when(saleCheckout.createPendingSaleForProvider(
+                any(), eq(7L), eq("cliente@example.com"), eq("MERCADO_PAGO"), isNull()))
                 .thenReturn(sale);
         when(mercadoPagoOAuthService.requestMerchantApi(
                 eq(7L), eq("/checkout/preferences"), eq("POST"), any(JsonNode.class), eq("mp-sale-42")))
@@ -96,5 +100,66 @@ class MercadoPagoCheckoutServiceTest {
         assertThat(item.path("description").asText()).isEqualTo("Camisa de algodão");
         assertThat(preferenceCaptor.getValue().path("back_urls").path("success").asText())
                 .startsWith("https://loja.example.com/success?");
+    }
+
+    @Test
+    void guestCheckoutReturnsPrivateTrackingTokenAndUsesGuestEmail() throws Exception {
+        AsaasCheckoutService saleCheckout = mock(AsaasCheckoutService.class);
+        SaleDao saleDao = mock(SaleDao.class);
+        StoreDao storeDao = mock(StoreDao.class);
+        MercadoPagoOAuthService mercadoPagoOAuthService = mock(MercadoPagoOAuthService.class);
+        ObjectMapper objectMapper = new ObjectMapper();
+        MercadoPagoCheckoutService service = new MercadoPagoCheckoutService(
+                saleCheckout, saleDao, storeDao, mercadoPagoOAuthService, objectMapper,
+                "https://example.com/api/v1/payment/mercadopago/webhook", "webhook-secret", "", "",
+                mock(JWTUtil.class), mock(ProductDao.class));
+
+        Store store = new Store();
+        store.setId(7L);
+        store.setName("Loja Teste");
+        store.setDomain("https://loja.example.com");
+        store.setPlan(StorePlan.COMPLETE);
+        store.setMpAccessToken("connected");
+        when(storeDao.findById(7L)).thenReturn(Optional.of(store));
+
+        Product product = new Product();
+        product.setId(11);
+        product.setName("Camisa verde");
+        SaleItem saleItem = new SaleItem();
+        saleItem.setProduct(product);
+        saleItem.setQuantity(1);
+        saleItem.setPrice(2900);
+        Sale guestSale = new Sale();
+        guestSale.setId(43L);
+        guestSale.setGuestEmail("visitante@example.com");
+        guestSale.setSaleItems(List.of(saleItem));
+        guestSale.setTotalPrice(2900.0);
+        when(saleCheckout.createPendingSaleForProvider(any(), eq(7L), isNull(), eq("MERCADO_PAGO"), anyString()))
+                .thenReturn(guestSale);
+        when(mercadoPagoOAuthService.requestMerchantApi(
+                eq(7L), eq("/checkout/preferences"), eq("POST"), any(JsonNode.class), eq("mp-sale-43")))
+                .thenReturn(objectMapper.readTree("""
+                        {"id":"preference-43","init_point":"https://checkout.example.com"}
+                        """));
+
+        SaleRequest saleRequest = new SaleRequest();
+        saleRequest.setSaleItemRequests(List.of(new SaleItemRequest(11, 1)));
+        saleRequest.setCustomerEmail("visitante@example.com");
+        saleRequest.setGuestCustomer(new GuestCustomerDetails(
+                "Visitante", "visitante@example.com", "84999999999", "52998224725"));
+
+        MercadoPagoCheckoutResponse response = service.createCheckout(
+                new MercadoPagoCheckoutRequest(saleRequest), 7L, null);
+
+        assertThat(response.guestAccessToken()).isNotBlank();
+        ArgumentCaptor<JsonNode> preferenceCaptor = ArgumentCaptor.forClass(JsonNode.class);
+        verify(mercadoPagoOAuthService).requestMerchantApi(
+                eq(7L), eq("/checkout/preferences"), eq("POST"), preferenceCaptor.capture(), eq("mp-sale-43"));
+        JsonNode preference = preferenceCaptor.getValue();
+        assertThat(preference.path("payer").path("email").asText()).isEqualTo("visitante@example.com");
+        assertThat(preference.path("back_urls").path("success").asText()).contains("guestToken=");
+        assertThat(preference.path("back_urls").path("failure").asText())
+                .contains("/payment/return?provider=mercadopago&saleId=")
+                .contains("guestToken=");
     }
 }

@@ -2,12 +2,14 @@ export interface Category {
   id: number;
   name: string;
   path: string;
+  parentId?: number | null;
 }
 
 export interface StoreInfo {
   id: number;
   plan?: "FREE" | "COMPLETE";
   name: string;
+  taxDocument?: string;
   domain: string;
   logoUrl: string;
   headerBackgroundColor?: string;

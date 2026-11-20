@@ -11,6 +11,9 @@ public class SaleRequest {
     private String shippingMethod;
     private String shippingZip;
     private String shippingQuote;
+    private String shippingQuoteToken;
+    private GuestCustomerDetails guestCustomer;
+    private GuestShippingAddress guestShippingAddress;
 
     public List<SaleItemRequest> getSaleItemRequests() {
         return saleItemRequests;
@@ -57,4 +60,14 @@ public class SaleRequest {
     public void setShippingZip(String shippingZip) { this.shippingZip = shippingZip; }
     public String getShippingQuote() { return shippingQuote; }
     public void setShippingQuote(String shippingQuote) { this.shippingQuote = shippingQuote; }
+    public String getShippingQuoteToken() { return shippingQuoteToken; }
+    public void setShippingQuoteToken(String shippingQuoteToken) {
+        this.shippingQuoteToken = shippingQuoteToken;
+    }
+    public GuestCustomerDetails getGuestCustomer() { return guestCustomer; }
+    public void setGuestCustomer(GuestCustomerDetails guestCustomer) { this.guestCustomer = guestCustomer; }
+    public GuestShippingAddress getGuestShippingAddress() { return guestShippingAddress; }
+    public void setGuestShippingAddress(GuestShippingAddress guestShippingAddress) {
+        this.guestShippingAddress = guestShippingAddress;
+    }
 }

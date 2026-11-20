@@ -1,4 +1,4 @@
-FROM node:20-bookworm-slim
+FROM node:24-bookworm-slim
 ARG api_build_url=http://amandita-api:8080/api/v1
 ARG api_runtime_url=/api/v1
 ARG google_client_id=
@@ -12,5 +12,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --no-audit
 COPY . .
 RUN npm run build
+RUN chown -R node:node /app
+USER node
 EXPOSE 3000
 CMD ["npm", "run", "start"]

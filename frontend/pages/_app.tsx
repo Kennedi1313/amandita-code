@@ -93,9 +93,11 @@ export default function App({ Component, pageProps }: AppProps) {
           <link
             rel="icon"
             href={
-              storeInfo.iconUrl.match(/^https?:\/\//i)
+              storeInfo.iconUrl?.match(/^https?:\/\//i)
                 ? storeInfo.iconUrl
-                : "/" + storeInfo.iconUrl + ".png"
+                : storeInfo.iconUrl
+                  ? "/" + storeInfo.iconUrl + ".png"
+                  : "/favicon.ico"
             }
           />
         ) : null}

@@ -8,6 +8,7 @@ import com.amandita.product.ProductDTOMapper;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 public record SaleResponse(
         Long id,
@@ -41,7 +42,7 @@ public record SaleResponse(
                 sale.getId(),
                 sale.getTotalPrice(),
                 sale.getSaleDate(),
-                customerMapper.apply(sale.getCustomer()),
+                customerForSale(sale, customerMapper),
                 sale.getPaymentMethod(),
                 sale.getPreferenceId(),
                 sale.getPaymentId(),
@@ -72,6 +73,28 @@ public record SaleResponse(
                         .filter(Objects::nonNull)
                         .toList()
                         : List.of()
+        );
+    }
+
+    private static CustomerDTO customerForSale(Sale sale, CustomerDTOMapper customerMapper) {
+        if (sale.getCustomer() != null) {
+            return customerMapper.apply(sale.getCustomer());
+        }
+        if (sale.getGuestEmail() == null) {
+            return null;
+        }
+        return new CustomerDTO(
+                null,
+                sale.getGuestName(),
+                sale.getGuestEmail(),
+                null,
+                null,
+                List.of(),
+                sale.getGuestEmail(),
+                null,
+                sale.getGuestPhone(),
+                Set.of(),
+                sale.getGuestCpf()
         );
     }
 

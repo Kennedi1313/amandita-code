@@ -39,6 +39,16 @@ public class Sale {
     @JoinColumn(name = "customer_id")
     private Customer customer;
 
+    @Column(name = "guest_name")
+    private String guestName;
+    @Column(name = "guest_email")
+    private String guestEmail;
+    @Column(name = "guest_phone")
+    private String guestPhone;
+    private String guestCpf;
+    @Column(name = "guest_access_token_hash", length = 64)
+    private String guestAccessTokenHash;
+
     @Column(name = "payment_method")
     private String paymentMethod;
 
@@ -81,6 +91,14 @@ public class Sale {
     private String melhorEnvioStatus;
     @Column(name = "melhor_envio_invoice_key")
     private String melhorEnvioInvoiceKey;
+    @Column(name = "melhor_envio_cart_id")
+    private String melhorEnvioCartId;
+    @Column(name = "melhor_envio_order_id")
+    private String melhorEnvioOrderId;
+    @Column(name = "melhor_envio_operation_status")
+    private String melhorEnvioOperationStatus;
+    @Column(name = "melhor_envio_operation_environment")
+    private String melhorEnvioOperationEnvironment;
     @Column(name = "external_tracking_code")
     private String externalTrackingCode;
 
@@ -137,6 +155,19 @@ public class Sale {
 
     public void setCustomer(Customer customer) {
         this.customer = customer;
+    }
+
+    public String getGuestName() { return guestName; }
+    public void setGuestName(String guestName) { this.guestName = guestName; }
+    public String getGuestEmail() { return guestEmail; }
+    public void setGuestEmail(String guestEmail) { this.guestEmail = guestEmail; }
+    public String getGuestPhone() { return guestPhone; }
+    public void setGuestPhone(String guestPhone) { this.guestPhone = guestPhone; }
+    public String getGuestCpf() { return guestCpf; }
+    public void setGuestCpf(String guestCpf) { this.guestCpf = guestCpf; }
+    public String getGuestAccessTokenHash() { return guestAccessTokenHash; }
+    public void setGuestAccessTokenHash(String guestAccessTokenHash) {
+        this.guestAccessTokenHash = guestAccessTokenHash;
     }
 
     public String getPaymentMethod() {
@@ -231,6 +262,14 @@ public class Sale {
     public void setMelhorEnvioLabelUrl(String melhorEnvioLabelUrl) { this.melhorEnvioLabelUrl = melhorEnvioLabelUrl; }
     public String getMelhorEnvioStatus() { return melhorEnvioStatus; }
     public void setMelhorEnvioStatus(String melhorEnvioStatus) { this.melhorEnvioStatus = melhorEnvioStatus; }
+    public String getMelhorEnvioCartId() { return melhorEnvioCartId; }
+    public void setMelhorEnvioCartId(String value) { this.melhorEnvioCartId = value; }
+    public String getMelhorEnvioOrderId() { return melhorEnvioOrderId; }
+    public void setMelhorEnvioOrderId(String value) { this.melhorEnvioOrderId = value; }
+    public String getMelhorEnvioOperationStatus() { return melhorEnvioOperationStatus; }
+    public void setMelhorEnvioOperationStatus(String value) { this.melhorEnvioOperationStatus = value; }
+    public String getMelhorEnvioOperationEnvironment() { return melhorEnvioOperationEnvironment; }
+    public void setMelhorEnvioOperationEnvironment(String value) { this.melhorEnvioOperationEnvironment = value; }
 
     public Store getStore() {
         return store;

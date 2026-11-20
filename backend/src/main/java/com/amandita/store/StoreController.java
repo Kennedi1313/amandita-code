@@ -2,11 +2,13 @@ package com.amandita.store;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.sql.Timestamp;
@@ -97,8 +99,15 @@ public class StoreController {
     }
     @GetMapping("/info")
     public ResponseEntity<StorePublicResponse> getStoreInfo(HttpServletRequest request) {
-        Store store = storeDao.findById( (Long) request.getAttribute("storeId"))
-                .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
+        Long storeId = (Long) request.getAttribute("storeId");
+        if (storeId == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Loja não identificada.");
+        }
+
+        Store store = storeDao.findById(storeId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Loja não identificada."));
         return ResponseEntity.ok(StorePublicResponse.fromEntity(store, mercadoPagoPublicKey));
     }
 

@@ -15,6 +15,7 @@ import {
   FormLabel,
   Flex,
   Grid,
+  GridItem,
   HStack,
   Icon,
   IconButton,
@@ -40,6 +41,7 @@ import {
 } from "@chakra-ui/react";
 import SidebarWithHeader from "./components/shared/SideBar.jsx";
 import PageHeader from "./components/shared/PageHeader.jsx";
+import { Link as RouterLink } from "react-router-dom";
 import {
   getSales,
   reconcileMercadoPagoSales,
@@ -55,7 +57,6 @@ import { useAuth } from "./components/context/AuthContext.jsx";
 import { errorNotification, successNotification } from "./services/notification.js";
 import {
   FiAlertCircle,
-  FiChevronRight,
   FiCheckCircle,
   FiClock,
   FiCreditCard,
@@ -139,19 +140,6 @@ const parsePriceToCents = (value) => {
 };
 
 const getSaleItems = (sale) => sale?.items || sale?.saleItems || [];
-
-const getCustomerIdentity = (sale) =>
-  sale?.customer?.email ||
-  sale?.customer?.cpf ||
-  sale?.customer?.phone ||
-  sale?.customer?.name ||
-  `pedido-${sale?.id}`;
-
-const countUniqueCustomers = (sales) =>
-  new Set(sales.map(getCustomerIdentity).filter(Boolean)).size;
-
-const pluralize = (count, singular, plural) =>
-  `${count} ${count === 1 ? singular : plural}`;
 
 const getItemsTotalCents = (sale) =>
   getSaleItems(sale).reduce((total, item) => {
@@ -297,7 +285,7 @@ const StatusBadge = ({ status }) => {
   );
 };
 
-const SalesDashboard = () => {
+const SalesDashboard = ({ view = "overview" }) => {
   const [sales, setSales] = useState([]);
   const [setupData, setSetupData] = useState({
     store: null,
@@ -312,6 +300,7 @@ const SalesDashboard = () => {
   const [statusFilter, setStatusFilter] = useState("TODOS");
   const [search, setSearch] = useState("");
   const [salesPage, setSalesPage] = useState(0);
+  const [dashboardPeriod, setDashboardPeriod] = useState("7d");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [generatingLabel, setGeneratingLabel] = useState(false);
   const [printingLabel, setPrintingLabel] = useState(false);
@@ -387,12 +376,15 @@ const SalesDashboard = () => {
     } finally {
       setReconcilingPayments(false);
     }
-    await Promise.all([fetchSales(), fetchSetupData()]);
+    await Promise.all([
+      fetchSales(),
+      view === "overview" ? fetchSetupData() : Promise.resolve(),
+    ]);
   };
 
   useEffect(() => {
     refreshSales();
-  }, [customer?.username]);
+  }, [customer?.username, view]);
 
   const filteredSales = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -435,72 +427,91 @@ const SalesDashboard = () => {
     );
   }, [salesPageCount]);
 
-  const summary = useMemo(() => {
-    const salesByStatuses = (statuses) =>
-      sales.filter((sale) => statuses.includes(normalizeStatus(sale.status)));
+  const dashboard = useMemo(() => {
+    const now = new Date();
+    const periodDays = dashboardPeriod === "30d" ? 30 : 7;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - periodDays + 1);
+    const endDate = new Date(today);
+    endDate.setDate(endDate.getDate() + 1);
+    const parseSaleDate = (sale) => {
+      const value = sale.saleDate;
+      const normalized = value && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(value)
+        ? `${value}Z`
+        : value;
+      const date = new Date(normalized);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const isConfirmed = (sale) =>
+      ["APROVADO", "PREPARANDO", "ENVIADO", "ENTREGUE"].includes(
+        normalizeStatus(sale.status),
+      );
+    const periodSales = sales.filter((sale) => {
+      const date = parseSaleDate(sale);
+      return date && date >= startDate && date < endDate;
+    });
+    const confirmedPeriodSales = periodSales.filter(isConfirmed);
+    const chartDays = Array.from({ length: periodDays }, (_, index) => {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + index);
+      const salesForDay = confirmedPeriodSales.filter((sale) => {
+        const saleDate = parseSaleDate(sale);
+        return saleDate && saleDate.toDateString() === date.toDateString();
+      });
 
-    const createCard = ({
-      title,
-      statuses,
-      filter,
-      tone,
-      icon,
-      description,
-    }) => {
-      const statusSales = salesByStatuses(statuses);
       return {
-        title,
-        filter,
-        tone,
-        icon,
-        description,
-        sales: statusSales,
-        amount: statusSales.reduce(
+        date,
+        label: periodDays === 7
+          ? date.toLocaleDateString("pt-BR", { weekday: "short" }).replace(".", "")
+          : index % 5 === 0
+            ? String(date.getDate()).padStart(2, "0")
+            : "",
+        amount: salesForDay.reduce(
           (total, sale) => total + getSaleAmounts(sale).totalCents,
           0,
         ),
-        customerCount: countUniqueCustomers(statusSales),
-        orderCount: statusSales.length,
       };
+    });
+    const productSales = new Map();
+    confirmedPeriodSales.forEach((sale) => {
+      getSaleItems(sale).forEach((item) => {
+        const quantity = Number(item.quantity || 0);
+        const productName = item.product?.name || item.name || "Produto removido";
+        const productId = item.product?.id || productName;
+        const current = productSales.get(productId) || {
+          id: productId,
+          name: productName,
+          quantity: 0,
+          revenue: 0,
+        };
+        current.quantity += quantity;
+        current.revenue += (parsePriceToCents(item.price) || 0) * quantity;
+        productSales.set(productId, current);
+      });
+    });
+    const periodRevenue = confirmedPeriodSales.reduce(
+      (total, sale) => total + getSaleAmounts(sale).totalCents,
+      0,
+    );
+
+    return {
+      periodLabel: periodDays === 7 ? "Últimos 7 dias" : "Últimos 30 dias",
+      periodOrderCount: periodSales.length,
+      periodRevenue,
+      averageTicket: confirmedPeriodSales.length
+        ? periodRevenue / confirmedPeriodSales.length
+        : 0,
+      chartDays,
+      maxDailyRevenue: Math.max(...chartDays.map((day) => day.amount), 0),
+      topProducts: [...productSales.values()]
+        .sort((first, second) => second.quantity - first.quantity)
+        .slice(0, 5),
+      recentSales: [...sales]
+        .sort((first, second) => new Date(second.saleDate) - new Date(first.saleDate))
+        .slice(0, 3),
     };
-
-    const dashboardCards = [
-      createCard({
-        title: "Recebidas",
-        statuses: ["ENTREGUE"],
-        filter: "ENTREGUE",
-        tone: "green",
-        icon: FiTruck,
-        description: "pedidos concluídos",
-      }),
-      createCard({
-        title: "Confirmadas",
-        statuses: ["APROVADO", "PREPARANDO"],
-        filter: "APROVADO",
-        tone: "blue",
-        icon: FiCheckCircle,
-        description: "pagas ou em preparo",
-      }),
-      createCard({
-        title: "Aguardando pagamento",
-        statuses: ["PENDENTE"],
-        filter: "PENDENTE",
-        tone: "orange",
-        icon: FiClock,
-        description: "checkout criado",
-      }),
-      createCard({
-        title: "Canceladas",
-        statuses: ["CANCELADO", "RECUSADO"],
-        filter: "CANCELADOS",
-        tone: "red",
-        icon: FiAlertCircle,
-        description: "sem continuidade",
-      }),
-    ];
-
-    return { dashboardCards };
-  }, [sales]);
+  }, [dashboardPeriod, sales]);
 
   function handleViewDetails(sale) {
     setSelectedSale(sale);
@@ -605,8 +616,12 @@ const SalesDashboard = () => {
     <SidebarWithHeader>
       <Box maxW="7xl" mx="auto" px={{ base: 0, md: 6 }} py={{ base: 3, md: 8 }}>
         <PageHeader
-          title="Vendas"
-          description="Acompanhe pedidos, pagamentos e preparo em um só lugar."
+          title={view === "overview" ? "Visão geral" : "Vendas"}
+          description={
+            view === "overview"
+              ? "Veja como estão as vendas e acompanhe os pedidos da loja."
+              : "Consulte, filtre e atualize os pedidos recebidos pela loja."
+          }
         >
           <Button
             variant="outline"
@@ -635,287 +650,535 @@ const SalesDashboard = () => {
           </Box>
         ) : (
           <Stack spacing={{ base: 3, md: 5 }}>
-            <SetupChecklist
-              setupData={setupData}
-              salesCount={sales.length}
-            />
-
-            <Box
-              bg="white"
-              border="1px solid"
-              borderColor="gray.100"
-              borderRadius="md"
-              p={{ base: 3, md: 5 }}
-              overflow="hidden"
-            >
-              <Flex
-                direction={{ base: "column", lg: "row" }}
-                gap={3}
-                justify="space-between"
-                align={{ base: "flex-start", lg: "center" }}
-                mb={5}
-              >
-                <Box>
-                  <Text fontSize={{ base: "xl", md: "2xl" }} fontWeight="bold">
-                    Pedidos por situação
-                  </Text>
-                  <Text color="gray.500" fontSize="sm">
-                    Visão rápida do dinheiro e do trabalho que ainda precisa de
-                    ação.
-                  </Text>
-                </Box>
-                <Button
-                  variant="outline"
-                  colorScheme="brand"
-                  leftIcon={<FiCreditCard />}
-                  onClick={() => {
-                    setStatusFilter("TODOS");
-                    setSalesPage(0);
-                  }}
+            {view === "overview" && (
+              <>
+                <SimpleGrid
+                  columns={{ base: 2, xl: 3 }}
+                  spacing={{ base: 2, md: 4 }}
                 >
-                  Todos os pedidos
-                </Button>
-              </Flex>
+                  <OverviewMetricCard
+                    title="Vendas confirmadas"
+                    value={formatCurrencyFromCents(dashboard.periodRevenue)}
+                    description={dashboard.periodLabel}
+                    icon={FiCreditCard}
+                  />
+                  <OverviewMetricCard
+                    title="Pedidos criados"
+                    value={dashboard.periodOrderCount}
+                    description={dashboard.periodLabel}
+                    icon={FiShoppingBag}
+                  />
+                  <OverviewMetricCard
+                    title="Ticket médio"
+                    value={formatCurrencyFromCents(dashboard.averageTicket)}
+                    description={dashboard.periodLabel}
+                    icon={FiTag}
+                  />
+                </SimpleGrid>
 
-              <SimpleGrid columns={{ base: 1, md: 2, xl: 4 }} spacing={4}>
-                {summary.dashboardCards.map((card) => (
-                  <DashboardStatusCard
-                    key={card.title}
-                    card={card}
-                    onClick={() => {
-                      setStatusFilter(card.filter);
-                      setSalesPage(0);
-                    }}
-                  />
-                ))}
-              </SimpleGrid>
-            </Box>
-
-            <Box
-              bg="white"
-              border="1px solid"
-              borderColor="gray.100"
-              borderRadius="md"
-              overflow="hidden"
-            >
-              <Flex
-                p={{ base: 3, md: 4 }}
-                gap={3}
-                direction={{ base: "column", lg: "row" }}
-                justify="space-between"
-              >
-                <Box position="relative" flex="1">
-                  <Icon
-                    as={FiSearch}
-                    color="gray.400"
-                    position="absolute"
-                    left={3}
-                    top="50%"
-                    transform="translateY(-50%)"
-                  />
-                  <Input
-                    pl={10}
-                    value={search}
-                    onChange={(event) => {
-                      setSearch(event.target.value);
-                      setSalesPage(0);
-                    }}
-                    placeholder="Buscar por pedido, cliente, email, telefone ou CPF"
-                  />
-                </Box>
-                <Select
-                  value={statusFilter}
-                  onChange={(event) => {
-                    setStatusFilter(event.target.value);
-                    setSalesPage(0);
+                <Grid
+                  templateColumns={{
+                    base: "1fr",
+                    xl: "minmax(0, 1.7fr) minmax(320px, 1fr)",
                   }}
-                  maxW={{ base: "full", lg: "220px" }}
+                  gap={{ base: 3, md: 5 }}
                 >
-                  <option value="TODOS">Todos os status</option>
-                  <option value="PENDENTE">Pendente</option>
-                  <option value="APROVADO">Aprovado</option>
-                  <option value="PREPARANDO">Preparando</option>
-                  <option value="ENTREGUE">Entregue</option>
-                  <option value="CANCELADO">Cancelado</option>
-                  <option value="CANCELADOS">Cancelados e recusados</option>
-                  <option value="RECUSADO">Recusado</option>
-                </Select>
-              </Flex>
-
-              {filteredSales.length === 0 ? (
-                <Box p={10} textAlign="center">
-                  <Icon as={FiShoppingBag} boxSize={10} color="gray.300" />
-                  <Text mt={3} fontWeight="semibold">
-                    Nenhuma venda encontrada
-                  </Text>
-                  <Text color="gray.500">
-                    Ajuste a busca ou o filtro para ver outros pedidos.
-                  </Text>
-                </Box>
-              ) : (
-                <>
-                  <SimpleGrid
-                    display={{ base: "grid", md: "none" }}
-                    columns={{ base: 1, sm: 2 }}
-                    spacing={2}
-                    p={{ base: 2, sm: 3 }}
-                  >
-                    {visibleSales.map((sale) => (
-                      <Box
-                        key={sale.id}
-                        border="1px solid"
-                        borderColor="gray.200"
-                        borderRadius="lg"
-                        p={3}
-                        minW={0}
+                  <GridItem order={{ base: 2, xl: 1 }}>
+                    <Box
+                      bg="white"
+                      border="1px solid"
+                      borderColor="gray.100"
+                      borderRadius="xl"
+                      p={{ base: 4, md: 5 }}
+                      h="full"
+                    >
+                      <Text
+                        fontSize="xs"
+                        fontWeight="bold"
+                        color="gray.500"
+                        letterSpacing="0.08em"
                       >
-                        <Grid templateColumns="1fr auto" gap={2} alignItems="start">
-                          <Box minW={0}>
-                            <Text fontWeight="bold" noOfLines={1}>
-                              Pedido #{sale.id}
-                            </Text>
-                            <Text fontSize="xs" color="gray.500">
-                              {formatDate(sale.saleDate)}
-                            </Text>
-                          </Box>
-                          <Tooltip label="Ver detalhes do pedido">
-                            <IconButton
-                              aria-label={`Ver detalhes do pedido ${sale.id}`}
-                              icon={<FiEye />}
-                              colorScheme="brand"
-                              variant="solid"
-                              size="sm"
+                        DESEMPENHO
+                      </Text>
+                      <Flex
+                        direction={{ base: "column", sm: "row" }}
+                        justify="space-between"
+                        align={{ base: "stretch", sm: "flex-end" }}
+                        gap={3}
+                        mt={1}
+                      >
+                        <Text fontSize="lg" fontWeight="bold">
+                          Vendas confirmadas
+                        </Text>
+                        <Flex align="center" justify="space-between" gap={3}>
+                          <Select
+                            size="sm"
+                            width="145px"
+                            aria-label="Período do gráfico de vendas"
+                            value={dashboardPeriod}
+                            onChange={(event) => setDashboardPeriod(event.target.value)}
+                          >
+                            <option value="7d">Últimos 7 dias</option>
+                            <option value="30d">Últimos 30 dias</option>
+                          </Select>
+                          <Text
+                            fontSize="lg"
+                            fontWeight="bold"
+                            color="brand.700"
+                            whiteSpace="nowrap"
+                          >
+                            {formatCurrencyFromCents(dashboard.periodRevenue)}
+                          </Text>
+                        </Flex>
+                      </Flex>
+
+                      <Flex
+                        align="flex-end"
+                        justify="space-between"
+                        gap={dashboardPeriod === "30d" ? 0.5 : 2}
+                        h="36"
+                        mt={5}
+                      >
+                        {dashboard.chartDays.map((day) => {
+                          const barHeight = dashboard.maxDailyRevenue
+                            ? Math.max(
+                                5,
+                                Math.round(
+                                  (day.amount / dashboard.maxDailyRevenue) *
+                                    108,
+                                ),
+                              )
+                            : 5;
+                          return (
+                            <Flex
+                              key={day.date.toISOString()}
+                              direction="column"
+                              align="center"
+                              justify="flex-end"
+                              gap={dashboardPeriod === "30d" ? 1 : 2}
+                              h="full"
+                              flex="1"
+                              minW={0}
+                            >
+                              <Box
+                                title={`${day.date.toLocaleDateString("pt-BR")}: ${formatCurrencyFromCents(day.amount)}`}
+                                w="full"
+                                maxW="34px"
+                                h={`${barHeight}px`}
+                                flexShrink={0}
+                                borderRadius="md"
+                                bg={day.amount > 0 ? "brand.500" : "gray.100"}
+                              />
+                              <Text
+                                fontSize="xs"
+                                color="gray.500"
+                                textTransform="capitalize"
+                                whiteSpace="nowrap"
+                                h="4"
+                                flexShrink={0}
+                              >
+                                {day.label}
+                              </Text>
+                            </Flex>
+                          );
+                        })}
+                      </Flex>
+                    </Box>
+                  </GridItem>
+
+                  <GridItem order={{ base: 1, xl: 2 }}>
+                    <Box
+                      bg="white"
+                      border="1px solid"
+                      borderColor="gray.100"
+                      borderRadius="xl"
+                      p={{ base: 4, md: 5 }}
+                      h="full"
+                    >
+                      <Flex justify="space-between" align="center" mb={3}>
+                        <Box>
+                          <Text
+                            fontSize="xs"
+                            fontWeight="bold"
+                            color="gray.500"
+                            letterSpacing="0.08em"
+                          >
+                            ACOMPANHAMENTO
+                          </Text>
+                          <Text fontSize="lg" fontWeight="bold">
+                            Pedidos recentes
+                          </Text>
+                        </Box>
+                        <Badge colorScheme="brand" borderRadius="full" px={2.5}>
+                          {dashboard.recentSales.length}
+                        </Badge>
+                      </Flex>
+                      {dashboard.recentSales.length ? (
+                        <Stack
+                          spacing={0}
+                          divider={<Divider borderColor="gray.100" />}
+                        >
+                          {dashboard.recentSales.map((sale) => (
+                            <Flex
+                              key={sale.id}
+                              as="button"
+                              type="button"
+                              w="full"
+                              py={3}
+                              gap={3}
+                              align="center"
+                              justify="space-between"
+                              textAlign="left"
                               onClick={() => handleViewDetails(sale)}
-                            />
-                          </Tooltip>
-                          <Box minW={0}>
-                            <Text fontSize="xs" color="gray.500">Cliente</Text>
-                            <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
-                              {sale.customer?.name || "Sem cliente"}
-                            </Text>
-                          </Box>
-                          <Box textAlign="right">
-                            <Text fontSize="xs" color="gray.500">Total</Text>
-                            <Text fontSize="sm" fontWeight="bold" whiteSpace="nowrap">
-                              {formatCurrencyFromCents(getSaleAmounts(sale).totalCents)}
-                            </Text>
-                          </Box>
-                          <Box gridColumn="1 / -1">
-                            <StatusBadge status={sale.status} />
-                          </Box>
-                        </Grid>
-                      </Box>
-                    ))}
-                  </SimpleGrid>
+                              _hover={{ bg: "gray.50" }}
+                            >
+                              <Box minW={0}>
+                                <HStack spacing={2} mb={1}>
+                                  <Text fontSize="sm" fontWeight="bold">
+                                    #{sale.id}
+                                  </Text>
+                                  <StatusBadge status={sale.status} />
+                                </HStack>
+                                <Text
+                                  fontSize="xs"
+                                  color="gray.500"
+                                  noOfLines={1}
+                                >
+                                  {sale.customer?.name || "Sem cliente"} ·{" "}
+                                  {formatDate(sale.saleDate)}
+                                </Text>
+                                {sale.customer?.id == null && sale.customer?.email && (
+                                  <Badge mt={1} colorScheme="purple" fontSize="10px">
+                                    Convidado
+                                  </Badge>
+                                )}
+                              </Box>
+                              <Text
+                                fontSize="sm"
+                                fontWeight="bold"
+                                whiteSpace="nowrap"
+                              >
+                                {formatCurrencyFromCents(
+                                  getSaleAmounts(sale).totalCents,
+                                )}
+                              </Text>
+                            </Flex>
+                          ))}
+                        </Stack>
+                      ) : (
+                        <Text
+                          py={6}
+                          fontSize="sm"
+                          color="gray.500"
+                          textAlign="center"
+                        >
+                          Os pedidos recebidos aparecerão aqui.
+                        </Text>
+                      )}
+                    <Button
+                      as={RouterLink}
+                      to="/dashboard/sales"
+                      size="sm"
+                      variant="outline"
+                      w="full"
+                      mt={3}
+                    >
+                      Ver todas as vendas
+                    </Button>
+                    </Box>
+                  </GridItem>
+                </Grid>
+                <TopProductsPanel
+                  products={dashboard.topProducts}
+                  periodLabel={dashboard.periodLabel}
+                />
+                <SetupChecklist
+                  setupData={setupData}
+                  salesCount={sales.length}
+                />
+              </>
+            )}
 
-                  <TableContainer display={{ base: "none", md: "block" }}>
-                    <Table variant="simple">
-                    <Thead bg="gray.50">
-                      <Tr>
-                        <Th>Pedido</Th>
-                        <Th>Cliente</Th>
-                        <Th>Status</Th>
-                        <Th>Entrega</Th>
-                        <Th isNumeric>Valor</Th>
-                        <Th textAlign="right">Detalhes</Th>
-                      </Tr>
-                    </Thead>
-                    <Tbody>
-                      {visibleSales.map((sale) => {
-                        const items = getSaleItems(sale);
-                        const itemCount = items.reduce(
-                          (total, item) => total + Number(item.quantity || 0),
-                          0,
-                        );
+            {view === "sales" && (
+              <Box
+                id="all-sales"
+                bg="white"
+                border="1px solid"
+                borderColor="gray.100"
+                borderRadius="md"
+                overflow="hidden"
+              >
+                <Flex
+                  p={{ base: 3, md: 4 }}
+                  gap={3}
+                  direction={{ base: "column", lg: "row" }}
+                  justify="space-between"
+                >
+                  <Box position="relative" flex="1">
+                    <Icon
+                      as={FiSearch}
+                      color="gray.400"
+                      position="absolute"
+                      left={3}
+                      top="50%"
+                      transform="translateY(-50%)"
+                    />
+                    <Input
+                      pl={10}
+                      value={search}
+                      onChange={(event) => {
+                        setSearch(event.target.value);
+                        setSalesPage(0);
+                      }}
+                      placeholder="Buscar por pedido, cliente, email, telefone ou CPF"
+                    />
+                  </Box>
+                  <Select
+                    value={statusFilter}
+                    onChange={(event) => {
+                      setStatusFilter(event.target.value);
+                      setSalesPage(0);
+                    }}
+                    maxW={{ base: "full", lg: "220px" }}
+                  >
+                    <option value="TODOS">Todos os status</option>
+                    <option value="PENDENTE">Pendente</option>
+                    <option value="APROVADO">Aprovado</option>
+                    <option value="PREPARANDO">Preparando</option>
+                    <option value="ENTREGUE">Entregue</option>
+                    <option value="CANCELADO">Cancelado</option>
+                    <option value="CANCELADOS">Cancelados e recusados</option>
+                    <option value="RECUSADO">Recusado</option>
+                  </Select>
+                </Flex>
 
-                        return (
-                          <Tr key={sale.id} _hover={{ bg: "gray.50" }}>
-                            <Td>
-                              <Text fontWeight="bold">#{sale.id}</Text>
-                              <Text fontSize="sm" color="gray.500">
+                {filteredSales.length === 0 ? (
+                  <Box p={10} textAlign="center">
+                    <Icon as={FiShoppingBag} boxSize={10} color="gray.300" />
+                    <Text mt={3} fontWeight="semibold">
+                      Nenhuma venda encontrada
+                    </Text>
+                    <Text color="gray.500">
+                      Ajuste a busca ou o filtro para ver outros pedidos.
+                    </Text>
+                  </Box>
+                ) : (
+                  <>
+                    <SimpleGrid
+                      display={{ base: "grid", md: "none" }}
+                      columns={{ base: 1, sm: 2 }}
+                      spacing={2}
+                      p={{ base: 2, sm: 3 }}
+                    >
+                      {visibleSales.map((sale) => (
+                        <Box
+                          key={sale.id}
+                          border="1px solid"
+                          borderColor="gray.200"
+                          borderRadius="lg"
+                          p={3}
+                          minW={0}
+                        >
+                          <Grid
+                            templateColumns="1fr auto"
+                            gap={2}
+                            alignItems="start"
+                          >
+                            <Box minW={0}>
+                              <Text fontWeight="bold" noOfLines={1}>
+                                Pedido #{sale.id}
+                              </Text>
+                              <Text fontSize="xs" color="gray.500">
                                 {formatDate(sale.saleDate)}
                               </Text>
-                            </Td>
-                            <Td maxW="260px">
-                              <Text fontWeight="semibold" noOfLines={1}>
-                                {sale.customer?.name || "Sem cliente"}
+                            </Box>
+                            <Tooltip label="Ver detalhes do pedido">
+                              <IconButton
+                                aria-label={`Ver detalhes do pedido ${sale.id}`}
+                                icon={<FiEye />}
+                                colorScheme="brand"
+                                variant="solid"
+                                size="sm"
+                                onClick={() => handleViewDetails(sale)}
+                              />
+                            </Tooltip>
+                            <Box minW={0}>
+                              <Text fontSize="xs" color="gray.500">
+                                Cliente
                               </Text>
-                              <Text fontSize="sm" color="gray.500" noOfLines={1}>
-                                {sale.customer?.email || "Sem email"}
-                              </Text>
-                            </Td>
-                            <Td>
-                              <StatusBadge status={sale.status} />
-                            </Td>
-                            <Td>
-                              <HStack spacing={2} color="gray.700">
-                                <Icon as={sale.shipment ? FiTruck : FiPackage} />
-                                <Text>{sale.shipment ? "Entrega" : "Retirada"}</Text>
+                              <HStack spacing={2} minW={0}>
+                                <Text
+                                  fontSize="sm"
+                                  fontWeight="semibold"
+                                  noOfLines={1}
+                                >
+                                  {sale.customer?.name || "Sem cliente"}
+                                </Text>
+                                {sale.customer?.id == null && sale.customer?.email && (
+                                  <Badge flexShrink={0} colorScheme="purple" fontSize="10px">
+                                    Convidado
+                                  </Badge>
+                                )}
                               </HStack>
-                              <Text fontSize="sm" color="gray.500">
-                                {itemCount} {itemCount === 1 ? "item" : "itens"}
+                            </Box>
+                            <Box textAlign="right">
+                              <Text fontSize="xs" color="gray.500">
+                                Total
                               </Text>
-                            </Td>
-                            <Td isNumeric fontWeight="bold">
-                              {formatCurrencyFromCents(getSaleAmounts(sale).totalCents)}
-                            </Td>
-                            <Td textAlign="right">
-                              <Tooltip label="Ver detalhes do pedido">
-                                <IconButton
-                                  aria-label="Ver detalhes do pedido"
-                                  icon={<FiEye />}
-                                  colorScheme="brand"
-                                  variant="solid"
-                                  onClick={() => handleViewDetails(sale)}
-                                />
-                              </Tooltip>
-                            </Td>
+                              <Text
+                                fontSize="sm"
+                                fontWeight="bold"
+                                whiteSpace="nowrap"
+                              >
+                                {formatCurrencyFromCents(
+                                  getSaleAmounts(sale).totalCents,
+                                )}
+                              </Text>
+                            </Box>
+                            <Box gridColumn="1 / -1">
+                              <StatusBadge status={sale.status} />
+                            </Box>
+                          </Grid>
+                        </Box>
+                      ))}
+                    </SimpleGrid>
+
+                    <TableContainer display={{ base: "none", md: "block" }}>
+                      <Table variant="simple">
+                        <Thead bg="gray.50">
+                          <Tr>
+                            <Th>Pedido</Th>
+                            <Th>Cliente</Th>
+                            <Th>Status</Th>
+                            <Th>Entrega</Th>
+                            <Th isNumeric>Valor</Th>
+                            <Th textAlign="right">Detalhes</Th>
                           </Tr>
-                        );
-                      })}
-                    </Tbody>
-                    </Table>
-                  </TableContainer>
-                </>
-              )}
-              {filteredSales.length > 0 && (
-                <Flex
-                  px={4}
-                  py={3}
-                  borderTop="1px solid"
-                  borderColor="gray.100"
-                  justify="space-between"
-                  flexDirection={{ base: "column", md: "row" }}
-                  align="center"
-                  gap={3}
-                >
-                  <Text fontSize="sm" color="gray.600">
-                    Exibindo {salesPage * salesPageSize + 1} – 
-                    {Math.min((salesPage + 1) * salesPageSize, filteredSales.length)} de {filteredSales.length} vendas
-                  </Text>
-                  <HStack>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      isDisabled={salesPage === 0}
-                      onClick={() => setSalesPage((page) => page - 1)}
-                    >
-                      Anterior
-                    </Button>
-                    <Text fontSize="sm" color="gray.600" minW="90px" textAlign="center">
-                      Página {salesPage + 1} de {salesPageCount}
+                        </Thead>
+                        <Tbody>
+                          {visibleSales.map((sale) => {
+                            const items = getSaleItems(sale);
+                            const itemCount = items.reduce(
+                              (total, item) =>
+                                total + Number(item.quantity || 0),
+                              0,
+                            );
+
+                            return (
+                              <Tr key={sale.id} _hover={{ bg: "gray.50" }}>
+                                <Td>
+                                  <Text fontWeight="bold">#{sale.id}</Text>
+                                  <Text fontSize="sm" color="gray.500">
+                                    {formatDate(sale.saleDate)}
+                                  </Text>
+                                </Td>
+                                <Td maxW="260px">
+                                  <Text fontWeight="semibold" noOfLines={1}>
+                                    {sale.customer?.name || "Sem cliente"}
+                                    {sale.customer?.id == null && sale.customer?.email && (
+                                      <Badge ml={2} colorScheme="purple" fontSize="10px">
+                                        Convidado
+                                      </Badge>
+                                    )}
+                                  </Text>
+                                  <Text
+                                    fontSize="sm"
+                                    color="gray.500"
+                                    noOfLines={1}
+                                  >
+                                    {sale.customer?.email || "Sem email"}
+                                  </Text>
+                                </Td>
+                                <Td>
+                                  <StatusBadge status={sale.status} />
+                                </Td>
+                                <Td>
+                                  <HStack spacing={2} color="gray.700">
+                                    <Icon
+                                      as={sale.shipment ? FiTruck : FiPackage}
+                                    />
+                                    <Text>
+                                      {sale.shipment ? "Entrega" : "Retirada"}
+                                    </Text>
+                                  </HStack>
+                                  <Text fontSize="sm" color="gray.500">
+                                    {itemCount}{" "}
+                                    {itemCount === 1 ? "item" : "itens"}
+                                  </Text>
+                                </Td>
+                                <Td isNumeric fontWeight="bold">
+                                  {formatCurrencyFromCents(
+                                    getSaleAmounts(sale).totalCents,
+                                  )}
+                                </Td>
+                                <Td textAlign="right">
+                                  <Tooltip label="Ver detalhes do pedido">
+                                    <IconButton
+                                      aria-label="Ver detalhes do pedido"
+                                      icon={<FiEye />}
+                                      colorScheme="brand"
+                                      variant="solid"
+                                      onClick={() => handleViewDetails(sale)}
+                                    />
+                                  </Tooltip>
+                                </Td>
+                              </Tr>
+                            );
+                          })}
+                        </Tbody>
+                      </Table>
+                    </TableContainer>
+                  </>
+                )}
+                {filteredSales.length > 0 && (
+                  <Flex
+                    px={4}
+                    py={3}
+                    borderTop="1px solid"
+                    borderColor="gray.100"
+                    justify="space-between"
+                    flexDirection={{ base: "column", md: "row" }}
+                    align="center"
+                    gap={3}
+                  >
+                    <Text fontSize="sm" color="gray.600">
+                      Exibindo {salesPage * salesPageSize + 1} –
+                      {Math.min(
+                        (salesPage + 1) * salesPageSize,
+                        filteredSales.length,
+                      )}{" "}
+                      de {filteredSales.length} vendas
                     </Text>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      isDisabled={salesPage >= salesPageCount - 1}
-                      onClick={() => setSalesPage((page) => page + 1)}>
-                      Próxima
-                    </Button>
-                  </HStack>
-                </Flex>
-              )}
-            </Box>
+                    <HStack>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        isDisabled={salesPage === 0}
+                        onClick={() => setSalesPage((page) => page - 1)}
+                      >
+                        Anterior
+                      </Button>
+                      <Text
+                        fontSize="sm"
+                        color="gray.600"
+                        minW="90px"
+                        textAlign="center"
+                      >
+                        Página {salesPage + 1} de {salesPageCount}
+                      </Text>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        isDisabled={salesPage >= salesPageCount - 1}
+                        onClick={() => setSalesPage((page) => page + 1)}
+                      >
+                        Próxima
+                      </Button>
+                    </HStack>
+                  </Flex>
+                )}
+              </Box>
+            )}
           </Stack>
         )}
       </Box>
@@ -963,14 +1226,24 @@ const SalesDashboard = () => {
                   onSaveTracking={saveExternalTracking}
                 />
                 {normalizeStatus(selectedSale.status) === "ENVIADO" ? (
-                  <TrackingPanel sale={selectedSale} onSaveTracking={saveExternalTracking} />
+                  <TrackingPanel
+                    sale={selectedSale}
+                    onSaveTracking={saveExternalTracking}
+                  />
                 ) : null}
 
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                   <InfoPanel title="Cliente" icon={FiUser}>
-                    <Text fontWeight="semibold">
-                      {selectedSale.customer?.name || "Sem cliente"}
-                    </Text>
+                    <HStack spacing={2}>
+                      <Text fontWeight="semibold">
+                        {selectedSale.customer?.name || "Sem cliente"}
+                      </Text>
+                      {selectedSale.customer?.id == null && selectedSale.customer?.email && (
+                        <Badge colorScheme="purple" fontSize="10px">
+                          Convidado
+                        </Badge>
+                      )}
+                    </HStack>
                     <Text color="gray.600">
                       {selectedSale.customer?.email || "Sem email"}
                     </Text>
@@ -990,29 +1263,36 @@ const SalesDashboard = () => {
                           ? "Entrega local"
                           : "Retirada"}
                     </Text>
-                    {selectedSale.shippingMethod?.startsWith("melhor_envio:") && selectedSale.shippingQuote && (
-                      <Text color="gray.600">
-                        {(() => {
-                          try {
-                            const quote = JSON.parse(selectedSale.shippingQuote);
-                            return `${quote.label || "Transportadora"}${quote.description ? ` · ${quote.description}` : ""}`;
-                          } catch {
-                            return "Cotação do Melhor Envio";
-                          }
-                        })()}
-                      </Text>
-                    )}
+                    {selectedSale.shippingMethod?.startsWith("melhor_envio:") &&
+                      selectedSale.shippingQuote && (
+                        <Text color="gray.600">
+                          {(() => {
+                            try {
+                              const quote = JSON.parse(
+                                selectedSale.shippingQuote,
+                              );
+                              return `${quote.label || "Transportadora"}${quote.description ? ` · ${quote.description}` : ""}`;
+                            } catch {
+                              return "Cotação do Melhor Envio";
+                            }
+                          })()}
+                        </Text>
+                      )}
                     <Text color="gray.600">
-                      Frete: {selectedSale.shipment
+                      Frete:{" "}
+                      {selectedSale.shipment
                         ? selectedAmounts.shippingCents > 0
-                          ? formatCurrencyFromCents(selectedAmounts.shippingCents)
+                          ? formatCurrencyFromCents(
+                              selectedAmounts.shippingCents,
+                            )
                           : "Grátis"
                         : "Grátis na retirada"}
                     </Text>
                     {selectedAddress ? (
                       <Text color="gray.600">
                         {selectedAddress.street}, {selectedAddress.number} -{" "}
-                        {selectedAddress.district}, {selectedAddress.city}/{selectedAddress.state || "--"},{" "}
+                        {selectedAddress.district}, {selectedAddress.city}/
+                        {selectedAddress.state || "--"},{" "}
                         {selectedSale.shippingZip}
                       </Text>
                     ) : (
@@ -1038,7 +1318,12 @@ const SalesDashboard = () => {
                   borderRadius="md"
                   overflow="hidden"
                 >
-                  <Flex justify="space-between" align="center" p={4} bg="gray.50">
+                  <Flex
+                    justify="space-between"
+                    align="center"
+                    p={4}
+                    bg="gray.50"
+                  >
                     <Text fontWeight="bold">Itens do pedido</Text>
                     <Text color="gray.500" fontSize="sm">
                       {selectedItems.length}{" "}
@@ -1049,7 +1334,8 @@ const SalesDashboard = () => {
 
                   {selectedItems.length === 0 ? (
                     <Box p={6} color="gray.600">
-                      Os produtos dessa compra foram excluídos do catálogo da loja.
+                      Os produtos dessa compra foram excluídos do catálogo da
+                      loja.
                     </Box>
                   ) : (
                     <Stack spacing={0} divider={<Divider />}>
@@ -1127,7 +1413,8 @@ const SalesDashboard = () => {
                                 </Text>
                                 <Text fontWeight="bold">
                                   {formatCurrencyFromCents(
-                                    (paidPrice || 0) * Number(item.quantity || 0),
+                                    (paidPrice || 0) *
+                                      Number(item.quantity || 0),
                                   )}
                                 </Text>
                               </Box>
@@ -1181,7 +1468,8 @@ const SalesDashboard = () => {
               </Flex>
               <Box>
                 <Text fontSize="lg" fontWeight="700">
-                  {statusTransitionCopy[pendingStatus]?.title || "Confirmar atualização do pedido"}
+                  {statusTransitionCopy[pendingStatus]?.title ||
+                    "Confirmar atualização do pedido"}
                 </Text>
                 <Text fontSize="sm" color="gray.500" fontWeight="normal">
                   Pedido #{selectedSale?.id}
@@ -1193,14 +1481,29 @@ const SalesDashboard = () => {
           <DrawerBody>
             <Stack spacing={4}>
               <Text color="gray.600" lineHeight="1.6">
-                {statusTransitionCopy[pendingStatus]?.description || "Revise a alteração antes de confirmar."}
+                {statusTransitionCopy[pendingStatus]?.description ||
+                  "Revise a alteração antes de confirmar."}
               </Text>
 
-              {pendingStatus === "ENVIADO" && selectedSale?.shippingMethod?.startsWith("melhor_envio:") && !selectedSale?.melhorEnvioShipmentId ? (
-                <Box p={4} borderWidth="1px" borderColor="orange.200" borderRadius="xl" bg="orange.50" color="orange.900">
-                  <Text fontWeight="700" mb={1}>Atenção antes de marcar como enviado</Text>
+              {pendingStatus === "ENVIADO" &&
+              selectedSale?.shippingMethod?.startsWith("melhor_envio:") &&
+              !selectedSale?.melhorEnvioShipmentId ? (
+                <Box
+                  p={4}
+                  borderWidth="1px"
+                  borderColor="orange.200"
+                  borderRadius="xl"
+                  bg="orange.50"
+                  color="orange.900"
+                >
+                  <Text fontWeight="700" mb={1}>
+                    Atenção antes de marcar como enviado
+                  </Text>
                   <Text fontSize="sm">
-                    Este pedido usa Melhor Envio, mas ainda não tem etiqueta gerada pela Kizi. Gere a etiqueta no botão ao lado ou crie o envio diretamente no site do Melhor Envio e informe o código de rastreio depois.
+                    Este pedido usa Melhor Envio, mas ainda não tem etiqueta
+                    gerada pela Kizi. Gere a etiqueta no botão ao lado ou crie o
+                    envio diretamente no site do Melhor Envio e informe o código
+                    de rastreio depois.
                   </Text>
                 </Box>
               ) : null}
@@ -1210,7 +1513,9 @@ const SalesDashboard = () => {
                   <FormLabel>Código de rastreio (opcional)</FormLabel>
                   <Input
                     value={externalTrackingCode}
-                    onChange={(event) => setExternalTrackingCode(event.target.value)}
+                    onChange={(event) =>
+                      setExternalTrackingCode(event.target.value)
+                    }
                     placeholder="Informe se a etiqueta foi gerada fora da Kizi"
                   />
                   <Text mt={1} fontSize="xs" color="gray.500">
@@ -1226,31 +1531,71 @@ const SalesDashboard = () => {
                 borderRadius="xl"
                 bg="gray.50"
               >
-                <Text fontSize="xs" fontWeight="700" color="gray.500" textTransform="uppercase" letterSpacing="wide" mb={3}>
+                <Text
+                  fontSize="xs"
+                  fontWeight="700"
+                  color="gray.500"
+                  textTransform="uppercase"
+                  letterSpacing="wide"
+                  mb={3}
+                >
                   Alteração do pedido
                 </Text>
-                <Stack direction={{ base: "column", sm: "row" }} align="stretch" spacing={3}>
-                  <Box flex="1" bg="white" borderWidth="1px" borderColor="gray.200" borderRadius="lg" p={3}>
-                    <Text fontSize="xs" color="gray.500" mb={2}>Status atual</Text>
+                <Stack
+                  direction={{ base: "column", sm: "row" }}
+                  align="stretch"
+                  spacing={3}
+                >
+                  <Box
+                    flex="1"
+                    bg="white"
+                    borderWidth="1px"
+                    borderColor="gray.200"
+                    borderRadius="lg"
+                    p={3}
+                  >
+                    <Text fontSize="xs" color="gray.500" mb={2}>
+                      Status atual
+                    </Text>
                     <StatusBadge status={selectedSale?.status} />
                   </Box>
-                  <Flex align="center" justify="center" color="gray.400" fontSize="lg" transform={{ base: "rotate(90deg)", sm: "none" }}>
+                  <Flex
+                    align="center"
+                    justify="center"
+                    color="gray.400"
+                    fontSize="lg"
+                    transform={{ base: "rotate(90deg)", sm: "none" }}
+                  >
                     →
                   </Flex>
-                  <Box flex="1" bg="white" borderWidth="1px" borderColor="brand.200" borderRadius="lg" p={3}>
-                    <Text fontSize="xs" color="gray.500" mb={2}>Novo status</Text>
+                  <Box
+                    flex="1"
+                    bg="white"
+                    borderWidth="1px"
+                    borderColor="brand.200"
+                    borderRadius="lg"
+                    p={3}
+                  >
+                    <Text fontSize="xs" color="gray.500" mb={2}>
+                      Novo status
+                    </Text>
                     <StatusBadge status={pendingStatus} />
                   </Box>
                 </Stack>
               </Box>
 
               <Text fontSize="sm" color="gray.500" lineHeight="1.5">
-                Essa alteração ficará visível para a loja e para o cliente no histórico do pedido.
+                Essa alteração ficará visível para a loja e para o cliente no
+                histórico do pedido.
               </Text>
             </Stack>
           </DrawerBody>
 
-          <DrawerFooter gap={3} flexDirection={{ base: "column-reverse", sm: "row" }} w="full">
+          <DrawerFooter
+            gap={3}
+            flexDirection={{ base: "column-reverse", sm: "row" }}
+            w="full"
+          >
             <Button
               w="full"
               variant="ghost"
@@ -1272,14 +1617,15 @@ const SalesDashboard = () => {
                 if (!pendingStatus || updatingStatus) return;
 
                 try {
-                  await changeStatus(selectedSale?.id, pendingStatus, externalTrackingCode);
+                  await changeStatus(
+                    selectedSale?.id,
+                    pendingStatus,
+                    externalTrackingCode,
+                  );
                   setIsStatusDrawerOpen(false);
                   setPendingStatus(null);
                 } catch (error) {
-                  console.error(
-                    "Erro ao alterar status do pedido:",
-                    error
-                  );
+                  console.error("Erro ao alterar status do pedido:", error);
                 }
               }}
             >
@@ -1333,27 +1679,49 @@ const SalesDashboard = () => {
                 pedido. Confira os dados antes de continuar.
               </Text>
 
-              <Box border="1px solid" borderColor="gray.200" borderRadius="lg" p={4}>
-                <FormControl display="flex" alignItems="center" justifyContent="space-between">
+              <Box
+                border="1px solid"
+                borderColor="gray.200"
+                borderRadius="lg"
+                p={4}
+              >
+                <FormControl
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="space-between"
+                >
                   <Box pr={4}>
-                    <FormLabel mb={1} fontWeight="semibold">Usar nota fiscal na etiqueta</FormLabel>
+                    <FormLabel mb={1} fontWeight="semibold">
+                      Usar nota fiscal na etiqueta
+                    </FormLabel>
                     <Text fontSize="sm" color="gray.600">
-                      Ative somente se este pedido tiver NF-e. Para envio sem nota, deixe desligado.
+                      Ative somente se este pedido tiver NF-e. Para envio sem
+                      nota, deixe desligado.
                     </Text>
                   </Box>
-                  <Switch isChecked={useInvoice} onChange={(event) => setUseInvoice(event.target.checked)} colorScheme="blue" />
+                  <Switch
+                    isChecked={useInvoice}
+                    onChange={(event) => setUseInvoice(event.target.checked)}
+                    colorScheme="blue"
+                  />
                 </FormControl>
                 {useInvoice ? (
                   <FormControl mt={4} isRequired>
                     <FormLabel>Chave de acesso da NF-e</FormLabel>
                     <Input
                       value={invoiceKey}
-                      onChange={(event) => setInvoiceKey(event.target.value.replace(/\D/g, "").slice(0, 44))}
+                      onChange={(event) =>
+                        setInvoiceKey(
+                          event.target.value.replace(/\D/g, "").slice(0, 44),
+                        )
+                      }
                       placeholder="44 dígitos"
                       inputMode="numeric"
                       maxLength={44}
                     />
-                    <Text mt={1} fontSize="xs" color="gray.500">A chave precisa ter 44 dígitos.</Text>
+                    <Text mt={1} fontSize="xs" color="gray.500">
+                      A chave precisa ter 44 dígitos.
+                    </Text>
                   </FormControl>
                 ) : null}
               </Box>
@@ -1383,13 +1751,18 @@ const SalesDashboard = () => {
                     </Flex>
 
                     <Box>
-                      <Text fontWeight="medium">
-                        Geração da etiqueta
-                      </Text>
+                      <Text fontWeight="medium">Geração da etiqueta</Text>
                       <Text fontSize="sm" color="gray.600">
                         O frete será comprado
-                        <Text as="span" fontSize="sm" color="orange.700" display="block" mt={1}>
-                          A cobrança será feita pela conta do Melhor Envio conectada à loja, conforme o valor do frete.
+                        <Text
+                          as="span"
+                          fontSize="sm"
+                          color="orange.700"
+                          display="block"
+                          mt={1}
+                        >
+                          A cobrança será feita pela conta do Melhor Envio
+                          conectada à loja, conforme o valor do frete.
                         </Text>
                       </Text>
                     </Box>
@@ -1409,11 +1782,10 @@ const SalesDashboard = () => {
                     </Flex>
 
                     <Box>
-                      <Text fontWeight="medium">
-                        Próximo passo
-                      </Text>
+                      <Text fontWeight="medium">Próximo passo</Text>
                       <Text fontSize="sm" color="gray.600">
-                        A etiqueta ficará disponível para impressão após a confirmação do Melhor Envio.
+                        A etiqueta ficará disponível para impressão após a
+                        confirmação do Melhor Envio.
                       </Text>
                     </Box>
                   </HStack>
@@ -1437,19 +1809,26 @@ const SalesDashboard = () => {
                       Importante
                     </Text>
                     <Text fontSize="sm" color="orange.800">
-                      A compra do frete não despacha o pacote automaticamente. Depois, embale o pedido e entregue-o no ponto ou transportadora indicados pelo Melhor Envio.
+                      A compra do frete não despacha o pacote automaticamente.
+                      Depois, embale o pedido e entregue-o no ponto ou
+                      transportadora indicados pelo Melhor Envio.
                     </Text>
                   </Box>
                 </HStack>
               </Box>
 
               <Text fontSize="sm" color="gray.500">
-                Ao confirmar, o frete poderá ser cobrado imediatamente. Deseja continuar?
+                Ao confirmar, o frete poderá ser cobrado imediatamente. Deseja
+                continuar?
               </Text>
             </Stack>
           </DrawerBody>
 
-          <DrawerFooter gap={3} flexDirection={{ base: "column-reverse", sm: "row" }} w="full">
+          <DrawerFooter
+            gap={3}
+            flexDirection={{ base: "column-reverse", sm: "row" }}
+            w="full"
+          >
             <Button
               variant="ghost"
               width="full"
@@ -1467,11 +1846,20 @@ const SalesDashboard = () => {
               loadingText="Gerando etiqueta..."
               onClick={async () => {
                 try {
-                  if (useInvoice && invoiceKey.replace(/\D/g, "").length !== 44) {
-                    errorNotification("Chave da NF-e inválida", "Informe a chave completa com 44 dígitos para continuar.");
+                  if (
+                    useInvoice &&
+                    invoiceKey.replace(/\D/g, "").length !== 44
+                  ) {
+                    errorNotification(
+                      "Chave da NF-e inválida",
+                      "Informe a chave completa com 44 dígitos para continuar.",
+                    );
                     return;
                   }
-                  await generateLabel(selectedSale.id, useInvoice ? invoiceKey : "");
+                  await generateLabel(
+                    selectedSale.id,
+                    useInvoice ? invoiceKey : "",
+                  );
                   setIsGenerateLabelDrawerOpen(false);
                 } catch (error) {
                   console.error("Erro ao gerar etiqueta:", error);
@@ -1483,7 +1871,6 @@ const SalesDashboard = () => {
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
-
     </SidebarWithHeader>
   );
 };
@@ -1509,17 +1896,15 @@ const SetupChecklist = ({ setupData, salesCount }) => {
     },
     {
       label: "Visual da loja",
-      description: "Logo e banner definidos",
-      done:
-        !defaultImageValues.has(store.logoUrl) &&
-        !defaultImageValues.has(store.bannerUrl),
+      description: "Logo da loja definido",
+      done: !defaultImageValues.has(store.logoUrl),
       href: "/dashboard/store",
       icon: FiImage,
     },
     {
       label: "Contato para venda",
-      description: "WhatsApp e Instagram cadastrados",
-      done: Boolean(store.whatsapp && store.instagram),
+      description: "WhatsApp cadastrado para atendimento",
+      done: Boolean(store.whatsapp),
       href: "/dashboard/profile",
       icon: FiMessageCircle,
     },
@@ -1547,37 +1932,17 @@ const SetupChecklist = ({ setupData, salesCount }) => {
       href: "/dashboard/shipping",
       icon: FiMapPin,
     },
-    {
-      label: "Recebimentos",
-      description: store.plan === "FREE"
-        ? "Disponível no plano Completo"
-        : "Conta de pagamento conectada",
+    ...(store.plan === "COMPLETE" ? [{
+      label: "Pagamento online",
+      description: "Conecte a conta que receberá as vendas",
       done: Boolean(store.mercadoPagoConfigured),
       href: "/dashboard/payments",
       icon: FiCreditCard,
-    },
-    {
-      label: "Primeiro pedido",
-      description: "Acompanhe tudo por aqui",
-      done: salesCount > 0,
-      href: "/dashboard",
-      icon: FiShoppingBag,
-    },
-    {
-      label: "Assinar plano Completo",
-      description: "Libere todos os recursos da loja",
-      done: store.plan === "COMPLETE",
-      href: "/dashboard/plan",
-      icon: FiLayers,
-    },
+    }] : []),
   ];
 
   const completedSteps = steps.filter((step) => step.done).length;
   const progress = Math.round((completedSteps / steps.length) * 100);
-
-  if (completedSteps === steps.length) {
-    return null;
-  }
 
   return (
     <Box
@@ -1599,11 +1964,15 @@ const SetupChecklist = ({ setupData, salesCount }) => {
               {completedSteps}/{steps.length}
             </Badge>
             <Text fontWeight="bold" fontSize={{ base: "lg", md: "xl" }}>
-              Deixe sua loja pronta para vender
+              Configuração da loja
             </Text>
           </HStack>
           <Text color="gray.500" fontSize="sm">
-            Um caminho curto para publicar a loja sem deixar o lojista perdido.
+            {completedSteps === steps.length
+              ? store.plan === "FREE"
+                ? "Configuração básica concluída. O plano grátis recebe pedidos pelo WhatsApp; checkout online depende do plano Completo."
+                : "Configuração concluída. Você pode revisar os dados da loja a qualquer momento."
+              : "Complete os itens essenciais para publicar seus produtos e receber pedidos."}
           </Text>
           <Progress
             mt={4}
@@ -1758,113 +2127,147 @@ const TrackingPanel = ({ sale, onSaveTracking }) => (
   </Box>
 );
 
-const dashboardTone = {
-  green: {
-    amount: "green.600",
-    border: "green.100",
-    soft: "green.50",
-  },
-  blue: {
-    amount: "blue.700",
-    border: "blue.100",
-    soft: "blue.50",
-  },
-  orange: {
-    amount: "orange.500",
-    border: "orange.100",
-    soft: "orange.50",
-  },
-  red: {
-    amount: "red.500",
-    border: "red.100",
-    soft: "red.50",
-  },
-};
+const OverviewMetricCard = ({ title, value, description, icon }) => (
+  <Flex
+    minW={0}
+    gap={{ base: 2, md: 3 }}
+    align="flex-start"
+    border="1px solid"
+    borderColor="gray.100"
+    borderRadius="xl"
+    bg="white"
+    p={{ base: 3, md: 4 }}
+    boxShadow="xs"
+  >
+    <Flex
+      w={{ base: 8, md: 10 }}
+      h={{ base: 8, md: 10 }}
+      flexShrink={0}
+      align="center"
+      justify="center"
+      borderRadius="lg"
+      bg="brand.50"
+      color="brand.700"
+    >
+      <Icon as={icon} boxSize={{ base: 4, md: 5 }} />
+    </Flex>
+    <Box minW={0}>
+      <Text color="gray.500" fontSize={{ base: "xs", md: "sm" }} noOfLines={1}>
+        {title}
+      </Text>
+      <Text mt={1} fontSize={{ base: "lg", md: "2xl" }} fontWeight="bold" lineHeight="short">
+        {value}
+      </Text>
+      <Text mt={1} color="gray.500" fontSize="xs" noOfLines={1}>
+        {description}
+      </Text>
+    </Box>
+  </Flex>
+);
 
-const DashboardStatusCard = ({ card, onClick }) => {
-  const tone = dashboardTone[card.tone] || dashboardTone.blue;
+const TopProductsPanel = ({ products, periodLabel }) => {
+  const maxQuantity = Math.max(...products.map((product) => product.quantity), 0);
 
   return (
     <Box
-      as="button"
-      type="button"
-      border="1px solid"
-      borderTopWidth="3px"
-      borderColor={tone.border}
-      borderTopColor={tone.amount}
-      borderRadius="xl"
-      p={4}
       bg="white"
-      w="full"
-      minH="164px"
-      textAlign="left"
-      boxShadow="xs"
-      transition="border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease"
-      onClick={onClick}
-      aria-label={`Filtrar ${card.title}: ${pluralize(card.orderCount, "pedido", "pedidos")}`}
-      _hover={{
-        borderColor: tone.amount,
-        boxShadow: "md",
-        transform: "translateY(-2px)",
-      }}
-      _active={{ transform: "translateY(0)" }}
-      _focusVisible={{
-        outline: "3px solid",
-        outlineColor: "brand.300",
-        outlineOffset: "2px",
-      }}
+      border="1px solid"
+      borderColor="gray.100"
+      borderRadius="xl"
+      p={{ base: 4, md: 5 }}
     >
-      <Flex justify="space-between" align="flex-start" gap={3}>
-        <Box minW={0}>
+      <Flex
+        direction={{ base: "column", sm: "row" }}
+        align={{ base: "stretch", sm: "center" }}
+        justify="space-between"
+        gap={3}
+        mb={4}
+      >
+        <Box>
           <Text
-            color="gray.800"
-            fontSize="sm"
+            fontSize="xs"
             fontWeight="bold"
-            noOfLines={1}
+            color="gray.500"
+            letterSpacing="0.08em"
           >
-            {card.title}
+            DESEMPENHO DO CATÁLOGO
           </Text>
-          <Text mt={1} color="gray.500" fontSize="xs">
-            {card.description}
+          <Text fontSize="lg" fontWeight="bold">
+            Produtos mais vendidos
+          </Text>
+          <Text fontSize="sm" color="gray.500">
+            {periodLabel} · pedidos confirmados
           </Text>
         </Box>
-        <Flex
-          w={9}
-          h={9}
-          borderRadius="lg"
-          bg={tone.soft}
-          color={tone.amount}
-          align="center"
-          justify="center"
-          flexShrink={0}
+        <Button
+          as={RouterLink}
+          to="/dashboard/sales"
+          size="sm"
+          variant="outline"
+          alignSelf={{ base: "stretch", sm: "auto" }}
         >
-          <Icon as={card.icon} boxSize={4} />
-        </Flex>
+          Ver vendas
+        </Button>
       </Flex>
-      <Text
-        mt={5}
-        color="gray.900"
-        fontSize={{ base: "2xl", xl: "3xl" }}
-        fontWeight="bold"
-        lineHeight="1.1"
-      >
-        {formatCurrencyFromCents(card.amount)}
-      </Text>
-      <Flex
-        align="center"
-        justify="space-between"
-        gap={2}
-        mt={4}
-        pt={3}
-        borderTop="1px solid"
-        borderColor="gray.100"
-      >
-        <Text color="gray.500" fontSize="xs">
-          {pluralize(card.orderCount, "pedido", "pedidos")} ·{" "}
-          {pluralize(card.customerCount, "cliente", "clientes")}
-        </Text>
-        <Icon as={FiChevronRight} color={tone.amount} flexShrink={0} />
-      </Flex>
+
+      {products.length ? (
+        <Stack spacing={0} divider={<Divider borderColor="gray.100" />}>
+          {products.map((product, index) => (
+            <Flex
+              key={product.id}
+              py={3}
+              gap={4}
+              align="center"
+              justify="space-between"
+            >
+              <Flex align="center" gap={3} minW={0} flex="1">
+                <Flex
+                  boxSize={9}
+                  flexShrink={0}
+                  align="center"
+                  justify="center"
+                  borderRadius="lg"
+                  bg="brand.50"
+                  color="brand.700"
+                  fontSize="sm"
+                  fontWeight="bold"
+                >
+                  {index + 1}
+                </Flex>
+                <Box minW={0} flex="1">
+                  <Text fontSize="sm" fontWeight="semibold" noOfLines={1}>
+                    {product.name}
+                  </Text>
+                  <Progress
+                    mt={2}
+                    value={maxQuantity ? (product.quantity / maxQuantity) * 100 : 0}
+                    colorScheme="brand"
+                    borderRadius="full"
+                    h="1.5"
+                  />
+                </Box>
+              </Flex>
+              <Box textAlign="right" flexShrink={0}>
+                <Text fontSize="sm" fontWeight="bold">
+                  {product.quantity} un.
+                </Text>
+                <Text fontSize="xs" color="gray.500">
+                  {formatCurrencyFromCents(product.revenue)}
+                </Text>
+              </Box>
+            </Flex>
+          ))}
+        </Stack>
+      ) : (
+        <Box py={8} textAlign="center" color="gray.500">
+          <Text fontSize="sm" fontWeight="medium">
+            Ainda não há vendas confirmadas neste período.
+          </Text>
+          <Text mt={1} fontSize="xs">
+            Os produtos vendidos aparecerão aqui.
+          </Text>
+        </Box>
+      )}
     </Box>
   );
 };

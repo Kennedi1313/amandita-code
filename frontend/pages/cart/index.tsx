@@ -1,10 +1,3 @@
-const Cart = () => null;
+import CartScreen from "@/components/cartScreen";
 
-export const getServerSideProps = async () => ({
-  redirect: {
-    destination: "/checkout",
-    permanent: false,
-  },
-});
-
-export default Cart;
+export default CartScreen;

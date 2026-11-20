@@ -7,6 +7,7 @@ This file is intended to help AI assistants and agents understand the structure,
 Amandita is a small monorepo containing:
 
 - `admin/` — React/Vite admin dashboard
+- `platform-admin/` — private React/Vite dashboard for the platform owner
 - `portal/` — React/Vite SaaS portal and store signup flow
 - `frontend/` — Next.js storefront
 - `backend/` — Spring Boot API service
@@ -109,13 +110,14 @@ npm run dev
 
 ## Important project details
 
-- Backend uses Java 21 and Spring Boot 3.0.0.
+- Backend uses Java 21 and Spring Boot 3.5.16.
 - The backend API port is `8080`.
 - The storefront runs on `3000` in local development.
 - The admin frontend runs on `4173` in local development.
+- The platform admin frontend runs on `4174` in local development.
 - The SaaS portal runs on `5174` in local development.
-- Docker Compose names services: `amandita-db`, `amandita-api`, `amandita-admin`, `amandita-frontend`, and `cloudflared`.
-- The backend container expects the database at `jdbc:postgresql://db:5432/amandita`.
+- Docker Compose names services: `amandita-db`, `amandita-api`, `amandita-admin`, `amandita-platform-admin`, `amandita-frontend`, and `amandita-portal`.
+- The backend container expects the database at `jdbc:postgresql://amandita-db:5432/amandita`.
 - Domain topology is centralized for admin/API: the admin app is shared, the backend API is shared, and only storefront domains vary by store.
 - Storefront requests identify the current store with `X-Store-Domain`; authenticated admin requests identify the store with the JWT `storeId`.
 - Do not add per-store admin/API host assumptions such as `admin.{storeDomain}` or `api.{storeDomain}`.
@@ -128,7 +130,7 @@ npm run dev
 - Verify changes with the project build and test commands before finalizing.
 - Avoid broad refactors across frontend and backend simultaneously unless the user explicitly requests cross-cutting work.
 - Keep API contracts stable; do not change backend endpoint paths, request/response shapes, or database schemas unless the user asks for it.
-- Note runtime ports and service dependencies: backend `8080`, frontend `3000`, admin `4173`, database `postgres://db:5432/amandita`.
+- Note runtime ports and service dependencies: backend `8080`, frontend `3000`, admin `4173`, platform admin `4174`, portal `5174`, database `postgres://amandita-db:5432/amandita`.
 - For backend changes, focus on `backend/pom.xml`, `backend/Dockerfile`, and `backend/src/main/java`.
 - For storefront work, focus on `frontend/pages`, `frontend/components`, `frontend/lib`, and `frontend/package.json`.
 - For admin work, focus on `admin/src`, `admin/package.json`, and `admin/Dockerfile`.

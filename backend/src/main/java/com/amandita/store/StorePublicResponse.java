@@ -89,13 +89,15 @@ public record StorePublicResponse(
     public record CategoryPublicResponse(
             Long id,
             String name,
-            String path
+            String path,
+            Long parentId
     ) {
         public static CategoryPublicResponse fromEntity(Category category) {
             return new CategoryPublicResponse(
                     category.getId(),
                     category.getName(),
-                    category.getPath()
+                    category.getPath(),
+                    category.getParentId()
             );
         }
     }

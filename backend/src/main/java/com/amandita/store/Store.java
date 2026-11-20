@@ -47,6 +47,8 @@ public class Store {
     private String mpSubscriptionLastPaymentId;
     @Column(name = "mp_subscription_last_payment_status")
     private String mpSubscriptionLastPaymentStatus;
+    @Column(name = "mp_subscription_last_paid_at")
+    private OffsetDateTime mpSubscriptionLastPaidAt;
     @Column(name = "mp_subscription_ever_paid", nullable = false)
     private boolean mpSubscriptionEverPaid;
     private String asaasWalletId;
@@ -209,6 +211,12 @@ public class Store {
 
     public void setMpSubscriptionLastPaymentStatus(String mpSubscriptionLastPaymentStatus) {
         this.mpSubscriptionLastPaymentStatus = mpSubscriptionLastPaymentStatus;
+    }
+
+    public OffsetDateTime getMpSubscriptionLastPaidAt() { return mpSubscriptionLastPaidAt; }
+
+    public void setMpSubscriptionLastPaidAt(OffsetDateTime mpSubscriptionLastPaidAt) {
+        this.mpSubscriptionLastPaidAt = mpSubscriptionLastPaidAt;
     }
 
     public boolean isMpSubscriptionEverPaid() { return mpSubscriptionEverPaid; }

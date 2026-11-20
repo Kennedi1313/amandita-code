@@ -1,0 +1,2 @@
+ALTER TABLE sale
+    ADD COLUMN IF NOT EXISTS guest_cpf VARCHAR(11);

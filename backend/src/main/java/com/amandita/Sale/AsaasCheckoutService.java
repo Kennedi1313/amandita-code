@@ -24,6 +24,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -124,18 +128,81 @@ public class AsaasCheckoutService {
     @Transactional(rollbackOn = Exception.class)
     public Sale createPendingSaleForProvider(SaleRequest saleRequest, Long storeId, String authenticatedEmail,
                                             String provider) {
+        return createPendingSaleForProvider(saleRequest, storeId, authenticatedEmail, provider, null);
+    }
+
+    @Transactional(rollbackOn = Exception.class)
+    public Sale createPendingSaleForProvider(SaleRequest saleRequest, Long storeId, String authenticatedEmail,
+                                            String provider, String guestAccessToken) {
         if (saleRequest == null || saleRequest.getSaleItemRequests() == null || saleRequest.getSaleItemRequests().isEmpty()) {
             throw new IllegalArgumentException("Carrinho vazio.");
         }
-        if (!StringUtils.equalsIgnoreCase(authenticatedEmail, saleRequest.getCustomerEmail())) {
-            throw new IllegalArgumentException("Cliente autenticado não corresponde ao pedido.");
-        }
         Store store = storeDao.findById(storeId)
                 .orElseThrow(() -> new IllegalArgumentException("Loja não identificada"));
-        Customer customer = customerDao.selectUserByEmailByStore(authenticatedEmail, storeId)
-                .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado."));
+        Customer customer = null;
+        GuestCustomerDetails guest = null;
+        if (StringUtils.isNotBlank(authenticatedEmail)) {
+            if (!StringUtils.equalsIgnoreCase(authenticatedEmail, saleRequest.getCustomerEmail())) {
+                throw new IllegalArgumentException("Cliente autenticado não corresponde ao pedido.");
+            }
+            customer = customerDao.selectUserByEmailByStore(authenticatedEmail, storeId)
+                    .orElseThrow(() -> new IllegalArgumentException("Cliente não encontrado."));
+        } else {
+            guest = validateGuestCustomer(saleRequest.getGuestCustomer());
+            if (!StringUtils.equalsIgnoreCase(guest.email(), saleRequest.getCustomerEmail())) {
+                throw new IllegalArgumentException("O e-mail do pedido não corresponde aos dados do comprador.");
+            }
+            if (StringUtils.isBlank(guestAccessToken)) {
+                throw new IllegalArgumentException("Não foi possível criar o acesso seguro ao pedido.");
+            }
+        }
         Sale sale = buildPendingSale(saleRequest, customer, store, provider);
+        if (guest != null) {
+            sale.setGuestName(guest.name().trim());
+            sale.setGuestEmail(guest.email().trim().toLowerCase(java.util.Locale.ROOT));
+            sale.setGuestPhone(guest.phone().replaceAll("\\D", ""));
+            sale.setGuestCpf(guest.cpf().replaceAll("\\D", ""));
+            sale.setGuestAccessTokenHash(hashGuestAccessToken(guestAccessToken));
+            GuestShippingAddress address = saleRequest.getGuestShippingAddress();
+            if (address != null) {
+                sale.setShippingZip(address.zip().replaceAll("\\D", ""));
+                sale.setShippingAddressStreet(address.street().trim());
+                sale.setShippingAddressNumber(address.number());
+                sale.setShippingAddressDistrict(address.district().trim());
+                sale.setShippingAddressCity(address.city().trim());
+                sale.setShippingAddressState(address.state().trim().toUpperCase(java.util.Locale.ROOT));
+                sale.setShippingAddressReference(StringUtils.trimToNull(address.reference()));
+            }
+        }
         return saleDao.insertSale(sale);
+    }
+
+    private GuestCustomerDetails validateGuestCustomer(GuestCustomerDetails guest) {
+        if (guest == null || StringUtils.isAnyBlank(guest.name(), guest.email(), guest.phone(), guest.cpf())) {
+            throw new IllegalArgumentException("Informe nome, e-mail, telefone e CPF para continuar como convidado.");
+        }
+        String email = guest.email().trim();
+        String phone = guest.phone().replaceAll("\\D", "");
+        String cpf = guest.cpf().replaceAll("\\D", "");
+        if (guest.name().trim().length() > 255 || email.length() > 255
+                || !email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
+            throw new IllegalArgumentException("Confira o nome e o e-mail informados.");
+        }
+        if (phone.length() < 10 || phone.length() > 15) {
+            throw new IllegalArgumentException("Informe um telefone com DDD para contato sobre o pedido.");
+        }
+        if (!GuestCustomerDetails.isValidCpf(cpf)) throw new IllegalArgumentException("Informe um CPF válido.");
+        return new GuestCustomerDetails(guest.name().trim(), email, phone, cpf);
+    }
+
+    private String hashGuestAccessToken(String token) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("Não foi possível proteger o acesso ao pedido.", exception);
+        }
     }
 
     @Transactional
@@ -230,7 +297,16 @@ public class AsaasCheckoutService {
             subtotalInCents += finalUnitPrice * itemRequest.getQuantity();
         }
 
-        if ("local_delivery".equals(saleRequest.getShippingMethod())) {
+        String requestedMethod = StringUtils.defaultIfBlank(
+                saleRequest.getShippingMethod(), inferShippingMethod(
+                        saleRequest.getShippingFee() == null ? 0 : saleRequest.getShippingFee().intValue(), store));
+        boolean guestDelivery = "local_delivery".equals(requestedMethod)
+                || requestedMethod.startsWith("melhor_envio:");
+        if (customer == null && guestDelivery) {
+            validateGuestShippingAddress(saleRequest.getGuestShippingAddress(), saleRequest.getShippingZip());
+        }
+
+        if ("local_delivery".equals(requestedMethod) && customer != null) {
             String requestedZip = saleRequest.getShippingZip() == null ? "" : saleRequest.getShippingZip().replaceAll("\\D", "");
             boolean belongsToCustomer = customer.getAddresses() != null && customer.getAddresses().stream()
                     .anyMatch(saved -> saved.getZip() != null && requestedZip.equals(saved.getZip().replaceAll("\\D", "")));
@@ -252,7 +328,7 @@ public class AsaasCheckoutService {
         sale.setShippingMethod(chosenMethod);
         sale.setShippingFee(shippingFee);
         sale.setShippingZip(saleRequest.getShippingZip());
-        if (customer.getAddresses() != null) {
+        if (customer != null && customer.getAddresses() != null) {
             customer.getAddresses().stream().findFirst().ifPresent(sale::snapshotShippingAddress);
         }
         sale.setShippingQuote(saleRequest.getShippingQuote());
@@ -260,6 +336,21 @@ public class AsaasCheckoutService {
         sale.setStore(store);
         sale.setStatus("PENDENTE");
         return sale;
+    }
+
+    private void validateGuestShippingAddress(GuestShippingAddress address, String requestedZip) {
+        if (address == null || StringUtils.isAnyBlank(address.zip(), address.street(), address.district(),
+                address.city(), address.state()) || address.number() == null || address.number() <= 0) {
+            throw new IllegalArgumentException("Informe o endereço completo para calcular e receber a entrega.");
+        }
+        String addressZip = address.zip().replaceAll("\\D", "");
+        if (addressZip.length() != 8 || !StringUtils.equals(addressZip,
+                requestedZip == null ? "" : requestedZip.replaceAll("\\D", ""))) {
+            throw new IllegalArgumentException("O CEP do endereço não corresponde ao CEP usado no frete.");
+        }
+        if (!address.state().trim().matches("(?i)^[a-z]{2}$")) {
+            throw new IllegalArgumentException("Informe a UF do endereço com duas letras.");
+        }
     }
 
     private int resolveShippingFee(SaleRequest saleRequest, Store store, int subtotalInCents) {

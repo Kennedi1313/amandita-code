@@ -18,6 +18,18 @@ import { useShoppingCart } from "@/hooks/use-shopping-cart";
 import useStoreInfo from "@/hooks/use-store-info";
 import ProductPrice from "./productPrice";
 
+const productBadgeClassName =
+  "absolute left-2 top-2 z-20 inline-flex max-w-[calc(100%-3.5rem)] truncate items-center rounded-full px-2.5 py-1 text-md font-semibold leading-4 text-white shadow-sm";
+
+const parseVariationPriceInCents = (price: string) => {
+  const numericPrice = price.replace(/[^\d,.-]/g, "");
+  const normalized = numericPrice.includes(",")
+    ? numericPrice.replace(/\./g, "").replace(",", ".")
+    : numericPrice;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) ? Math.round(amount * 100) : 0;
+};
+
 interface ItemProps {
   id: string;
   name: string;
@@ -64,27 +76,37 @@ export default function Item(props: ItemProps) {
   if (!storeInfo) return null;
 
   const hasVariations = props.variations && props.variations.length > 0;
+  const hasPromotionalVariation = Boolean(
+    props.variations?.some((variation) => Number(variation.promo || 0) > 0),
+  );
   const totalQuantity = hasVariations
     ? props.variations!.reduce(
         (total, variation) => total + Number(variation.quantity || 0),
         0,
       )
     : props.quantity;
-  const prices = hasVariations
-    ? props.variations!
-        .map((variation) =>
-          Number(variation.price.replace(".", "").replace(",", ".")),
-        )
-        .filter((price) => price > 0)
+  const variationPrices = hasVariations
+    ? props
+        .variations!.map((variation) => ({
+          ...variation,
+          priceInCents: parseVariationPriceInCents(variation.price),
+        }))
+        .filter((variation) => variation.priceInCents > 0)
     : [];
-  const priceText =
-    prices.length > 0
-      ? `R$ ${Math.min(...prices).toFixed(2).replace(".", ",")} - R$ ${Math.max(
-          ...prices,
-        )
-          .toFixed(2)
-          .replace(".", ",")}`
-      : null;
+  const availableVariationPrices = variationPrices.filter(
+    (variation) => Number(variation.quantity || 0) > 0,
+  );
+  const startingVariation = [
+    ...(availableVariationPrices.length
+      ? availableVariationPrices
+      : variationPrices),
+  ].sort((first, second) => {
+    const firstPrice =
+      first.priceInCents * (1 - Number(first.promo || 0) / 100);
+    const secondPrice =
+      second.priceInCents * (1 - Number(second.promo || 0) / 100);
+    return firstPrice - secondPrice;
+  })[0];
 
   return (
     <div className="relative">
@@ -101,32 +123,49 @@ export default function Item(props: ItemProps) {
             fill
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 50vw, 33vw"
           />
-          {totalQuantity === 0 && (
-            <span
-              aria-label="Produto indisponível"
-              className="absolute left-2 top-2 z-10 inline-flex rounded-full bg-red-600 px-2.5 py-1 text-[10px] font-semibold text-white shadow-sm sm:text-xs"
-            >
-              Esgotado
-            </span>
-          )}
         </div>
         <div className="flex min-h-[4.5rem] flex-1 flex-col justify-between gap-2 px-1 pb-1">
           <span className="line-clamp-2 text-sm font-medium leading-5 text-gray-800 sm:text-base">
             {props.name}
           </span>
-          {priceText ? (
-            <span className="font-semibold">{priceText}</span>
+          {startingVariation ? (
+            <div>
+              <span className="text-xs font-medium text-gray-500">
+                A partir de
+              </span>
+              <ProductPrice
+                price={startingVariation.price}
+                promo={Number(startingVariation.promo || 0)}
+              />
+            </div>
           ) : (
-            <ProductPrice price={props.price} promo={props.promo}></ProductPrice>
+            <ProductPrice
+              price={props.price}
+              promo={props.promo}
+            ></ProductPrice>
           )}
         </div>
       </Link>
+
+      {totalQuantity === 0 && (
+        <span
+          aria-label="Produto indisponível"
+          className={`${productBadgeClassName} bg-rose-600`}
+        >
+          Esgotado
+        </span>
+      )}
+      {totalQuantity > 0 && hasPromotionalVariation && (
+        <span className={`${productBadgeClassName} bg-rose-600`}>
+          Em oferta
+        </span>
+      )}
 
       <button
         type="button"
         aria-label={`${isInFavorites() ? "Remover dos favoritos" : "Adicionar aos favoritos"}: ${props.name}`}
         aria-pressed={isInFavorites()}
-        className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-rose-400 shadow-sm backdrop-blur transition hover:scale-105 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
+        className="absolute right-2 top-2 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white/95 text-rose-400 shadow-sm backdrop-blur transition hover:scale-105 hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-gray-900"
         disabled={adding}
         onClick={() => {
           isInFavorites()
@@ -147,13 +186,10 @@ export default function Item(props: ItemProps) {
       />
 
       {totalQuantity > 0 && props.promo > 0 && !hasVariations ? (
-        <span className="font-bold text-[14px] absolute left-[3%] top-2 rounded-lg bg-brown-1000 py-2 px-4 text-white w-fit">
+        <span className={`${productBadgeClassName} bg-rose-600`}>
           -{props.promo}%
         </span>
-      ) : (
-        <></>
-      )}
-
+      ) : null}
     </div>
   );
 }

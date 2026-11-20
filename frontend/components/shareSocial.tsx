@@ -1,5 +1,6 @@
 import React from "react";
 import { FiShare2 } from "react-icons/fi"; // Import a share icon from Feather Icons
+import { toast } from "react-hot-toast";
 
 interface ShareProps {
   productName: string;
@@ -17,21 +18,30 @@ const Share: React.FC<ShareProps> = ({ productName, productUrl }) => {
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-        console.log("Shared successfully");
       } catch (error) {
-        console.error("Error sharing", error);
+        if (error instanceof Error && error.name !== "AbortError") {
+          toast.error("Não foi possível compartilhar este produto.");
+        }
       }
-    } else {
-      alert("Web Share API is not supported in your browser");
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(productUrl);
+      toast.success("Link do produto copiado!");
+    } catch {
+      window.prompt("Copie o link do produto:", productUrl);
     }
   };
 
   return (
-    <div>
+    <div className="pointer-events-none">
       <button
+        type="button"
+        aria-label={`Compartilhar ${productName}`}
+        title="Compartilhar produto"
         onClick={handleNativeShare}
-        className="rounded-full absolute right-1 top-16 border-[1px] border-gray-200 flex flex-row 
-            bg-white opacity-80 justify-center items-center p-3"
+        className="pointer-events-auto absolute right-2 top-14 z-20 flex h-11 w-11 items-center justify-center rounded-full border border-gray-200 bg-white/95 shadow-sm backdrop-blur"
       >
         <FiShare2 className="w-5 h-5 opacity-100 text-gray-700" />
       </button>
